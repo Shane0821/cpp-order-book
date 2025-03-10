@@ -56,6 +56,7 @@ include_directories(
 # Build
 # ============================
 
+add_subdirectory(include)
 add_subdirectory(src)
 
 # Conditionally build demo
