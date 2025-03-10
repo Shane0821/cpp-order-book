@@ -3,7 +3,7 @@
 
 #include <string>
 
-#include "flyweightstring.hpp"
+#include "util/flyweightstring.h"
 
 class Order {
    public:
@@ -13,7 +13,7 @@ class Order {
     using Price = double;
     using Volume = double;
     using Quant = std::uint64_t;
-    using OrderID = std::uint64_t;
+    using OrderID = std::string;
 
     explicit Order(OrderID _orderID, std::string _owner, std::string _target,
                    std::string _symbol, Side _side, Quant _quantity, Price _price)
