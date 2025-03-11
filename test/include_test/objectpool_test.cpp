@@ -16,7 +16,7 @@ TEST(ObjectPoolTest, ObjectPoolTest) {
     };
 
     {
-        ObjectPool<TestObject> pool(32);
+        auto &pool = ObjectPool<TestObject>::GetInst();
         EXPECT_EQ(createCount, 32);
         EXPECT_EQ(pool.size(), 32);
 
@@ -34,10 +34,11 @@ TEST(ObjectPoolTest, ObjectPoolTest) {
             EXPECT_EQ(p2->getData(), 10);
             p2->data = 20;
             EXPECT_EQ(p2->getData(), 20);
+            // destroy p2
         }
 
         EXPECT_EQ(pool.size(), 31);
     }
     EXPECT_EQ(createCount, 32);
-    EXPECT_EQ(destroyCount, 32);
+    EXPECT_EQ(destroyCount, 1);
 };
