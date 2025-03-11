@@ -5,7 +5,6 @@
 
 // T must be: no-throw default constructible and no-throw destructible
 template <typename T>
-    requires std::default_initializable<T> && std::destructible<T>
 class Singleton {
    public:
     // If, at any point (in user code), Singleton<T>::instance()
