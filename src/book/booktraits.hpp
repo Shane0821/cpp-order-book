@@ -1,7 +1,7 @@
 #ifndef _BOOK_TRAITS_HPP
 #define _BOOK_TRAITS_HPP
 
-#include "book_concepts.hpp"
+#include "bookconcepts.hpp"
 #include "order.hpp"
 
 // Primary template
