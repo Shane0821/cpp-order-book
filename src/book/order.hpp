@@ -1,6 +1,7 @@
 #ifndef _ORDER_HPP
 #define _ORDER_HPP
 
+#include <iostream>
 #include <string>
 
 #include "util/flyweightstring.h"
@@ -25,6 +26,13 @@ class Order {
           quantity(_quantity),
           price(_price),
           openQuantity(_quantity) {}
+
+    friend std::ostream& operator << (std::ostream& os, const Order& order) {
+        return os << "OrderID: " << order.orderID << ", Symbol: " << order.symbol
+                  << ", Owner: " << order.owner << ", Target: " << order.target
+                  << ", Side: " << (order.side == Side::Buy ? "Buy" : "Sell")
+                  << ", Quantity: " << order.quantity << ", Price: " << order.price << std::endl;
+    }
 
     FlyweightString owner;
     FlyweightString target;

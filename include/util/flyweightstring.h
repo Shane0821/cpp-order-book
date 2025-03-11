@@ -28,7 +28,9 @@ class FlyweightString {
     bool operator!=(const FlyweightString& other) const { return value != other.value; }
     bool operator<(const FlyweightString& other) const { return value < other.value; }
 
-    std::ostream& operator<<(std::ostream& os) const { return os << *value; }
+    friend std::ostream& operator<<(std::ostream& os, const FlyweightString& str) {
+        return os << *str.value;
+    }
 
    private:
     // get or add a string to the pool
