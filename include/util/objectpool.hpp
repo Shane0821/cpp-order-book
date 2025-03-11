@@ -6,18 +6,14 @@
 #include <mutex>
 #include <vector>
 
-template <typename T, size_t MIN_SIZE = 16, size_t MAX_SIZE = 65536>
-    requires std::default_initializable<T> && std::destructible<T>
-class ObjectPool {
-   public:
-    ObjectPool(size_t initialSize = MIN_SIZE) {
-        initialSize = std::min(std::max(initialSize, MIN_SIZE), MAX_SIZE);
-        pool.reserve(initialSize);
-        for (size_t i = 0; i < initialSize; ++i) {
-            pool.push_back(std::make_unique<T>());
-        }
-    }
+#include "singleton.hpp"
 
+template <typename T, size_t MIN_SIZE = 32, size_t MAX_SIZE = 65536>
+    requires std::default_initializable<T> && std::destructible<T>
+class ObjectPool : public Singleton<ObjectPool<T, MIN_SIZE, MAX_SIZE>> {
+    friend class Singleton<ObjectPool<T, MIN_SIZE, MAX_SIZE>>;
+
+   public:
     // forbid copy
     ObjectPool(const ObjectPool&) = delete;
     ObjectPool& operator=(const ObjectPool&) = delete;
@@ -45,8 +41,15 @@ class ObjectPool {
         pool.push_back(std::move(obj));
     }
 
-    size_t size() const {
-        return pool.size();
+    size_t size() const { return pool.size(); }
+
+   protected:
+    ObjectPool(size_t initialSize = MIN_SIZE) {
+        initialSize = std::min(std::max(initialSize, MIN_SIZE), MAX_SIZE);
+        pool.reserve(initialSize);
+        for (size_t i = 0; i < initialSize; ++i) {
+            pool.push_back(std::make_unique<T>());
+        }
     }
 
    private:
