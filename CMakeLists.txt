@@ -28,6 +28,7 @@ set(CONFIG_DIR "${ROOT_DIR}/config")
 
 include_directories(
     ${INCLUDE_DIR}
+    ${SRC_DIR}
 )
 
 # ============================
