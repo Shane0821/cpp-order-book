@@ -16,6 +16,12 @@ class Order {
     using Quant = std::uint64_t;
     using OrderID = std::string;
 
+    struct Hash {
+        std::size_t operator()(const Order& order) const {
+            return std::hash<OrderID>()(order.orderID);
+        }
+    };
+    
     explicit Order(OrderID _orderID, std::string _owner, std::string _target,
                    std::string _symbol, Side _side, Quant _quantity, Price _price)
         : orderID(_orderID),
@@ -27,12 +33,17 @@ class Order {
           price(_price),
           openQuantity(_quantity) {}
 
-    friend std::ostream& operator << (std::ostream& os, const Order& order) {
+    friend std::ostream& operator<<(std::ostream& os, const Order& order) {
         return os << "OrderID: " << order.orderID << ", Symbol: " << order.symbol
                   << ", Owner: " << order.owner << ", Target: " << order.target
                   << ", Side: " << (order.side == Side::Buy ? "Buy" : "Sell")
-                  << ", Quantity: " << order.quantity << ", Price: " << order.price << std::endl;
+                  << ", Quantity: " << order.quantity << ", Price: " << order.price
+                  << std::endl;
     }
+
+    bool operator==(const Order& other) const { return orderID == other.orderID; }
+    bool operator<(const Order& other) const { return price < other.price; }
+    bool operator>(const Order& other) const { return price > other.price; }
 
     FlyweightString owner;
     FlyweightString target;
