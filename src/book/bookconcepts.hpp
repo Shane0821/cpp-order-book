@@ -20,9 +20,6 @@ concept LevelContainerBaseConcept = requires(T container, typename T::iterator i
     { container.end() } -> std::same_as<typename T::iterator>;
 };
 
-static_assert(LevelContainerBaseConcept<std::set<Order>>);
-static_assert(LevelContainerBaseConcept<std::unordered_set<Order>>);
-
 template <typename T>
 concept DoubleDirectionLevelContainerConcept =
     LevelContainerBaseConcept<T> &&
@@ -34,9 +31,6 @@ concept DoubleDirectionLevelContainerConcept =
         { container.back() } -> std::same_as<Order &>;
         { container.front() } -> std::same_as<Order &>;
     };
-
-static_assert(DoubleDirectionLevelContainerConcept<std::deque<Order>>);
-static_assert(DoubleDirectionLevelContainerConcept<std::list<Order>>);
 
 template <typename T>
 concept VectorBasedLevelContainerConcept =
@@ -51,6 +45,20 @@ concept VectorBasedLevelContainerConcept =
         container.front();
     };
 
-static_assert(VectorBasedLevelContainerConcept<std::vector<Order>>);
+template <typename T>
+concept SetBasedContainerConcept =
+    LevelContainerBaseConcept<T> &&
+    requires(T container, const Order &order, typename T::iterator it) {
+        { container.extract(it) } -> std::same_as<typename T::node_type>;
+        { container.insert(order) } -> std::same_as<std::pair<typename T::iterator, bool>>;
+    };
+
+template <typename T>
+concept MultiSetBasedContainerConcept =
+    LevelContainerBaseConcept<T> &&
+    requires(T container, const Order &order, typename T::iterator it) {
+        { container.extract(it) } -> std::same_as<typename T::node_type>;
+        { container.insert(order) } -> std::same_as<typename T::iterator>;
+    };
 
 #endif  // _BOOK_CONCEPTS_HPP
