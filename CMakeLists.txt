@@ -63,7 +63,7 @@ add_subdirectory(src)
 if (BUILD_DEMO)
     add_subdirectory(demo)
     add_custom_target(demo ALL
-        DEPENDS engine
+        DEPENDS lbook
     )
 endif()
 
@@ -71,6 +71,6 @@ endif()
 if (BUILD_TEST)
     add_subdirectory(test)
     add_custom_target(test ALL
-        DEPENDS engine
+        DEPENDS lutil lbook
     )
 endif()
