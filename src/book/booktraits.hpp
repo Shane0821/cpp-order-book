@@ -7,8 +7,8 @@
 template <typename LevelContainer>
 struct LevelContainerTraits {
     static LevelContainer::iterator insert(LevelContainer& container, const Order& order)
-        requires DoubleDirectionLevelContainerConcept<LevelContainer> ||
-                 VectorBasedLevelContainerConcept<LevelContainer>
+        requires BiDirectionLevelContainerConcept<LevelContainer> ||
+                 ForwardLevelContainerConcept<LevelContainer>
     {
         container.push_back(order);
         return std::prev(container.end());
@@ -33,13 +33,13 @@ struct LevelContainerTraits {
     }
 
     static LevelContainer::iterator first(LevelContainer& container)
-        requires(!VectorBasedLevelContainerConcept<LevelContainer>)
+        requires(!ForwardLevelContainerConcept<LevelContainer>)
     {
         return container.begin();
     }
 
     static LevelContainer::iterator first(LevelContainer& container)
-        requires VectorBasedLevelContainerConcept<LevelContainer>
+        requires ForwardLevelContainerConcept<LevelContainer>
     {
         return std::prev(container.end());
     }
@@ -57,7 +57,7 @@ static_assert(has_valid_insert_v<std::vector<Order>>, "vector has valid insert")
 static_assert(has_valid_insert_v<std::deque<Order>>, "deque has valid insert");
 static_assert(has_valid_insert_v<std::list<Order>>, "list has valid insert");
 static_assert(has_valid_insert_v<std::set<Order>>, "set has valid insert");
-static_assert(has_valid_insert_v<std::unordered_set<Order>>,
+static_assert(has_valid_insert_v<std::unordered_set<Order, Order::Hash, Order::Equal>>,
               "unordered_set has valid insert");
 
 #endif  // _BOOK_TRAITS_HPP

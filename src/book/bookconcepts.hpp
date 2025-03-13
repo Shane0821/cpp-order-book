@@ -21,7 +21,7 @@ concept LevelContainerBaseConcept = requires(T container, typename T::iterator i
 };
 
 template <typename T>
-concept DoubleDirectionLevelContainerConcept =
+concept BiDirectionLevelContainerConcept =
     LevelContainerBaseConcept<T> &&
     requires(T container, const Order &order, typename T::iterator it) {
         { container.push_back(order) } -> std::same_as<void>;
@@ -33,7 +33,7 @@ concept DoubleDirectionLevelContainerConcept =
     };
 
 template <typename T>
-concept VectorBasedLevelContainerConcept =
+concept ForwardLevelContainerConcept =
     LevelContainerBaseConcept<T> &&
     requires(T container, const Order &order, typename T::iterator it) {
         { container.push_back(order) } -> std::same_as<void>;
