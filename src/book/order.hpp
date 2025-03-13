@@ -21,6 +21,12 @@ class Order {
             return std::hash<OrderID>()(order.orderID);
         }
     };
+
+    struct Equal {
+        bool operator()(const Order& lhs, const Order& rhs) const {
+            return lhs.orderID == rhs.orderID;
+        }
+    };
     
     explicit Order(OrderID _orderID, std::string _owner, std::string _target,
                    std::string _symbol, Side _side, Quant _quantity, Price _price)
