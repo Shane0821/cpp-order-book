@@ -38,31 +38,32 @@ TEST(BookTraitsTest, LevelContainerTraits) {
 
     {
         std::set<Order> s;
-        auto it3 = LevelContainerTraits<decltype(s)>::insert(
+        auto it = LevelContainerTraits<decltype(s)>::insert(
             s, Order("1", "a", "b", "AAPL", Order::Side::Buy, 100, 100.0));
-        EXPECT_EQ(it3, s.begin());
-        auto it4 = LevelContainerTraits<decltype(s)>::insert(
+        EXPECT_EQ(it, s.begin());
+        auto it2 = LevelContainerTraits<decltype(s)>::insert(
             s, Order("2", "a", "b", "AAPL", Order::Side::Buy, 100, 99.0));
-        EXPECT_EQ(it4, s.begin());
+        EXPECT_EQ(it2, s.begin());
     }
 
     {
         std::multiset<Order> s;
-        auto it3 = LevelContainerTraits<decltype(s)>::insert(
+        auto it = LevelContainerTraits<decltype(s)>::insert(
             s, Order("1", "a", "b", "AAPL", Order::Side::Buy, 100, 100.0));
-        EXPECT_EQ(it3, s.begin());
-        auto it4 = LevelContainerTraits<decltype(s)>::insert(
+        EXPECT_EQ(it, s.begin());
+        auto it2 = LevelContainerTraits<decltype(s)>::insert(
             s, Order("2", "a", "b", "AAPL", Order::Side::Buy, 100, 99.0));
-        EXPECT_EQ(it4, s.begin());
+        EXPECT_EQ(it2, s.begin());
     }
 
     {
-        std::unordered_set<Order, Order::Hash> s;
-        auto it3 = LevelContainerTraits<decltype(s)>::insert(
+        std::unordered_set<Order, Order::Hash, Order::Equal> s;
+        auto it = LevelContainerTraits<decltype(s)>::insert(
             s, Order("1", "a", "b", "AAPL", Order::Side::Buy, 100, 100.0));
-        EXPECT_EQ(it3, s.begin());
-        auto it4 = LevelContainerTraits<decltype(s)>::insert(
+        EXPECT_EQ(it, s.begin());
+
+        auto it2 = LevelContainerTraits<decltype(s)>::insert(
             s, Order("2", "a", "b", "AAPL", Order::Side::Buy, 100, 99.0));
-        EXPECT_EQ(it4, std::prev(s.end()));
+        // std::prev(s.end()); // wrong. unordered_set iterator is not bidirectional
     }
 }
