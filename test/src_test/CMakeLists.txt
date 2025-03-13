@@ -10,6 +10,7 @@ add_executable(
 target_link_libraries(
   src_test
   GTest::gtest_main
+  lutil
 )
 
 gtest_discover_tests(src_test)
