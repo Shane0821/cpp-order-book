@@ -5,7 +5,7 @@
 #include <memory>
 
 // Simple lock-free single-producer single-consumer queue
-template <typename T, size_t Capacity>
+template <typename T, size_t Capacity = 65536>
 class SPSCQueue : private std::allocator<T> {
    public:
     SPSCQueue() {
