@@ -1,6 +1,7 @@
 #ifndef _ORDER_HPP
 #define _ORDER_HPP
 
+#include <chrono>
 #include <iostream>
 #include <string>
 
@@ -15,6 +16,7 @@ class Order {
     using Volume = double;
     using Quant = std::uint64_t;
     using OrderID = std::string;
+    using Time = std::chrono::time_point<std::chrono::high_resolution_clock>;
 
     struct Hash {
         std::size_t operator()(const Order& order) const {
@@ -27,7 +29,7 @@ class Order {
             return lhs.orderID == rhs.orderID;
         }
     };
-    
+
     explicit Order(OrderID _orderID, std::string _owner, std::string _target,
                    std::string _symbol, Side _side, Quant _quantity, Price _price)
         : orderID(_orderID),
@@ -48,8 +50,18 @@ class Order {
     }
 
     bool operator==(const Order& other) const { return orderID == other.orderID; }
-    bool operator<(const Order& other) const { return price < other.price; }
-    bool operator>(const Order& other) const { return price > other.price; }
+    bool operator<(const Order& other) const {
+        if (price == other.price) {
+            return creationTime < other.creationTime;
+        }
+        return price < other.price;
+    }
+    bool operator>(const Order& other) const {
+        if (price == other.price) {
+            return creationTime < other.creationTime;
+        }
+        return price > other.price;
+    }
 
     FlyweightString owner;
     FlyweightString target;
@@ -59,12 +71,13 @@ class Order {
     Quant quantity;
     Price price;
 
-    bool canceled{false};
     Quant openQuantity;
     Quant executedQuantity;
     Quant lastExecutedQuantity;
     Price averageExecutedPrice;
     Price lastExecutedPrice;
+
+    Time creationTime;
 };
 
 #endif  // _ORDER_HPP
