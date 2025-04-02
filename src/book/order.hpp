@@ -39,7 +39,8 @@ class Order {
           side(_side),
           quantity(_quantity),
           price(_price),
-          openQuantity(_quantity) {}
+          openQuantity(_quantity),
+          creationTime(std::chrono::high_resolution_clock::now()) {}
 
     friend std::ostream& operator<<(std::ostream& os, const Order& order) {
         return os << "OrderID: " << order.orderID << ", Symbol: " << order.symbol
@@ -68,14 +69,14 @@ class Order {
     FlyweightString symbol;
     Side side;
     OrderID orderID;
-    Quant quantity;
-    Price price;
+    Quant quantity{0};
+    Price price{0};
 
-    Quant openQuantity;
-    Quant executedQuantity;
-    Quant lastExecutedQuantity;
-    Price averageExecutedPrice;
-    Price lastExecutedPrice;
+    Quant openQuantity{0};
+    Quant executedQuantity{0};
+    Quant lastExecutedQuantity{0};
+    Price averageExecutedPrice{0};
+    Price lastExecutedPrice{0};
 
     Time creationTime;
 };
