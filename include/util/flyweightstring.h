@@ -27,6 +27,7 @@ class FlyweightString {
     bool operator==(const FlyweightString& other) const { return value == other.value; }
     bool operator!=(const FlyweightString& other) const { return value != other.value; }
     bool operator<(const FlyweightString& other) const { return value < other.value; }
+    bool operator>(const FlyweightString& other) const { return value > other.value; }
 
     friend std::ostream& operator<<(std::ostream& os, const FlyweightString& str) {
         return os << *str.value;
@@ -39,8 +40,9 @@ class FlyweightString {
     static std::shared_ptr<std::string> getOrAdd(std::string&& str);
 
     // string pool
-    inline static std::unordered_map<std::string, 
-                                     std::shared_ptr<std::string>, StringHash> pool;
+    inline static std::unordered_map<std::string, std::shared_ptr<std::string>,
+                                     StringHash>
+        pool;
     // mutex for pool
     inline static std::mutex mutex;
 
