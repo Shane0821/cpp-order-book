@@ -5,6 +5,7 @@
 #include "order.hpp"
 
 template <typename LevelContainer>
+    requires LevelContainerBaseConcept<LevelContainer>
 struct LevelContainerTraits {
     static LevelContainer::iterator insert(LevelContainer& container, const Order& order)
         requires BiDirectionLevelContainerConcept<LevelContainer> ||
@@ -28,9 +29,11 @@ struct LevelContainerTraits {
         return it;
     }
 
-    static void erase(LevelContainer& container, LevelContainer::iterator it) {
+    static void erase(LevelContainer& container, const LevelContainer::iterator& it) {
         container.erase(it);
     }
+
+    static bool empty(LevelContainer& container) { return container.empty(); }
 
     static LevelContainer::iterator first(LevelContainer& container)
         requires(!ForwardLevelContainerConcept<LevelContainer>)
