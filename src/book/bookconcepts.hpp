@@ -18,6 +18,8 @@ concept LevelContainerBaseConcept = requires(T container, typename T::iterator i
     { container.erase(it) } -> std::same_as<typename T::iterator>;
     { container.begin() } -> std::same_as<typename T::iterator>;
     { container.end() } -> std::same_as<typename T::iterator>;
+    { container.cbegin() } -> std::same_as<typename T::const_iterator>;
+    { container.cend() } -> std::same_as<typename T::const_iterator>;
     { container.empty() } -> std::same_as<bool>;
 };
 
