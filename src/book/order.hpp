@@ -39,7 +39,6 @@ class Order {
           side(_side),
           quantity(_quantity),
           price(_price),
-          openQuantity(_quantity),
           creationTime(std::chrono::high_resolution_clock::now()) {}
 
     friend std::ostream& operator<<(std::ostream& os, const Order& order) {
@@ -71,12 +70,6 @@ class Order {
     OrderID orderID;
     Quant quantity{0};
     Price price{0};
-
-    Quant openQuantity{0};
-    Quant executedQuantity{0};
-    Quant lastExecutedQuantity{0};
-    Price averageExecutedPrice{0};
-    Price lastExecutedPrice{0};
 
     Time creationTime;
 };
