@@ -3,7 +3,6 @@ cmake_minimum_required(VERSION 3.2)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_COMPILER "g++-10")
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Options to build demo and test
@@ -35,27 +34,28 @@ include_directories(
 # Libraries
 # ============================
 
-# link_directories(
-#     ${THIRD_PARTY_DIR}/protobuf/src/.libs
-#     ${THIRD_PARTY_DIR}/llbc/output/gmake/release64
-# )
 
 # ============================
 # Pakcages
 # ============================
 
 
-
 # ============================
 # Files
 # ============================
 
-# file(GLOB_RECURSE CONFIG_FILES ${CONFIG_DIR}/*)
-# file(COPY ${CONFIG_FILES} DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/config)
 
 # ============================
 # Build
 # ============================
+
+include(FetchContent)
+
+FetchContent_Declare(
+  fmt
+  GIT_REPOSITORY https://github.com/fmtlib/fmt
+  GIT_TAG        e69e5f977d458f2650bb346dadf2ad30c5320281) # 10.2.1
+FetchContent_MakeAvailable(fmt)
 
 add_subdirectory(include)
 add_subdirectory(src)
@@ -64,7 +64,7 @@ add_subdirectory(src)
 if (BUILD_DEMO)
     add_subdirectory(demo)
     add_custom_target(demo ALL
-        DEPENDS lbook
+        DEPENDS lutil lbook
     )
 endif()
 
