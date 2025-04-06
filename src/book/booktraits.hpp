@@ -8,8 +8,8 @@ template <typename LevelContainer>
     requires LevelContainerBaseConcept<LevelContainer>
 struct LevelContainerTraits {
     static LevelContainer::iterator insert(LevelContainer& container, const Order& order)
-        requires BiDirectionLevelContainerConcept<LevelContainer> ||
-                 ForwardLevelContainerConcept<LevelContainer>
+        requires BiDirectionLevelContainerConcept<LevelContainer>
+
     {
         container.push_back(order);
         return std::prev(container.end());
@@ -35,16 +35,8 @@ struct LevelContainerTraits {
 
     static bool empty(LevelContainer& container) { return container.empty(); }
 
-    static LevelContainer::iterator first(LevelContainer& container)
-        requires(!ForwardLevelContainerConcept<LevelContainer>)
-    {
-        return container.begin();
-    }
-
-    static LevelContainer::iterator first(LevelContainer& container)
-        requires ForwardLevelContainerConcept<LevelContainer>
-    {
-        return std::prev(container.end());
+    static LevelContainer::const_iterator first(const LevelContainer& container) {
+        return container.cbegin();
     }
 };
 
@@ -56,7 +48,8 @@ constexpr bool has_valid_insert_v = requires(T container, const Order& order) {
     } -> std::same_as<typename T::iterator>;
 };
 
-static_assert(has_valid_insert_v<std::vector<Order>>, "vector has valid insert");
+static_assert(!has_valid_insert_v<std::vector<Order>>,
+              "vector doesn't have valid insert");
 static_assert(has_valid_insert_v<std::deque<Order>>, "deque has valid insert");
 static_assert(has_valid_insert_v<std::list<Order>>, "list has valid insert");
 static_assert(has_valid_insert_v<std::set<Order>>, "set has valid insert");

@@ -4,17 +4,6 @@
 
 TEST(BookTraitsTest, LevelContainerTraits) {
     {
-        std::vector<Order> v;
-
-        auto it = LevelContainerTraits<decltype(v)>::insert(
-            v, Order("1", "a", "b", "AAPL", Order::Side::Buy, 100, 100.0));
-        EXPECT_EQ(it, std::prev(v.end()));
-        auto it2 = LevelContainerTraits<decltype(v)>::insert(
-            v, Order("2", "a", "b", "AAPL", Order::Side::Buy, 100, 100.0));
-        EXPECT_EQ(it2, std::prev(v.end()));
-    }
-
-    {
         std::list<Order> v;
 
         auto it = LevelContainerTraits<decltype(v)>::insert(
