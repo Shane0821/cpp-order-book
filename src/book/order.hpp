@@ -16,7 +16,7 @@ class Order {
     using Volume = double;
     using Quant = std::uint64_t;
     using OrderID = std::string;
-    using Time = std::chrono::time_point<std::chrono::high_resolution_clock>;
+    using Timestamp = std::chrono::time_point<std::chrono::high_resolution_clock>;
 
     struct Hash {
         std::size_t operator()(const Order& order) const {
@@ -71,7 +71,7 @@ class Order {
     Quant quantity{0};
     Price price{0};
 
-    Time creationTime;
+    Timestamp creationTime;
 };
 
 #endif  // _ORDER_HPP

@@ -6,7 +6,6 @@
 #include <stdexcept>
 #include <unordered_map>
 #include <utility>
-#include <variant>
 
 #include "booktraits.hpp"
 #include "util/logger.h"
@@ -137,7 +136,7 @@ class MapBasedPriceLevelOrderBook
         // within the same level
         if (order.price == newPrice) {
             order.quantity = newQuantity;
-            order.createTime = std::chrono::system_clock::now();
+            order.creationTime = std::chrono::high_resolution_clock::now();
 
             auto& container = orderIDToMapItMap[orderID]->second;
 
@@ -155,7 +154,7 @@ class MapBasedPriceLevelOrderBook
         // update the order
         order.quantity = newQuantity;
         order.price = newPrice;
-        order.createTime = std::chrono::system_clock::now();
+        order.creationTime = std::chrono::high_resolution_clock::now();
         // add the order
         addOrderImpl(order);
         return true;
