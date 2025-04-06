@@ -6,8 +6,10 @@
 #include <stdexcept>
 #include <unordered_map>
 #include <utility>
+#include <variant>
 
 #include "booktraits.hpp"
+#include "util/logger.h"
 
 template <typename Derived>
 class OrderBook {
@@ -48,22 +50,22 @@ class OrderBook {
                                                                     newPrice);
     }
 
-    bool isBidEmpty() const { return static_cast<Derived*>(this)->bids.empty(); }
+    bool isBidEmpty() const { return static_cast<const Derived*>(this)->bids.empty(); }
 
-    bool isAskEmpty() const { return static_cast<Derived*>(this)->asks.empty(); }
+    bool isAskEmpty() const { return static_cast<const Derived*>(this)->asks.empty(); }
 
     // get the best bid order
     const Order& getBestBid() const {
-        return static_cast<Derived*>(this)->getBestBidImpl();
+        return static_cast<const Derived*>(this)->getBestBidImpl();
     }
 
     // get the best ask order
     const Order& getBestAsk() const {
-        return static_cast<Derived*>(this)->getBestAskImpl();
+        return static_cast<const Derived*>(this)->getBestAskImpl();
     }
 
     // print the order book
-    void print() const { static_cast<Derived*>(this)->printImpl(); }
+    void print() const { static_cast<const Derived*>(this)->printImpl(); }
 };
 
 template <typename LevelContainer>
@@ -73,10 +75,8 @@ class MapBasedPriceLevelOrderBook
     std::map<Order::Price, LevelContainer, std::greater<Order::Price>> bids;
     std::map<Order::Price, LevelContainer, std::less<Order::Price>> asks;
 
-    // rb tree <price, container> iterator
-    using MapIterator = decltype(bids)::iterator;
-
-    std::unordered_map<Order::OrderID, MapIterator> orderIDToMapItMap;
+    std::unordered_map<Order::OrderID, typename decltype(bids)::iterator>
+        orderIDToMapItMap;
     std::unordered_map<Order::OrderID, typename LevelContainer::iterator>
         orderIDToLevelContainerItMap;
 
@@ -84,17 +84,18 @@ class MapBasedPriceLevelOrderBook
     ~MapBasedPriceLevelOrderBook() = default;
 
     bool addOrderImpl(const Order& order) {
-        auto& map = order.side == Order::Side::Buy ? bids : asks;
+        if (orderIDToMapItMap.find(order.orderID) != orderIDToMapItMap.end()) {
+            return false;
+        }
 
-        // create a new level if it doesn't exist
-        auto [it, inserted] = map.try_emplace(order.price, LevelContainer{});
-        orderIDToMapItMap[order.orderID] = it;
+        if (order.side == Order::Side::Buy) {
+            // add order to the bid side
+            return addOrderToMap(bids, order);
+        } else {
+            // add order to the ask side
+            return addOrderToMap(asks, order);
+        }
 
-        // insert order into the level
-        // it->second is the container
-        auto levelContainerIt =
-            LevelContainerTraits<LevelContainer>::insert(it->second, order);
-        orderIDToLevelContainerItMap[order.orderID] = levelContainerIt;
         return true;
     }
 
@@ -168,23 +169,34 @@ class MapBasedPriceLevelOrderBook
         return *LevelContainerTraits<LevelContainer>::first(asks.begin()->second);
     }
 
-    void printImpl() const {
-        // LOG_INFO("Order Book");
+    void printImpl() const { LOG_INFO("Order Book"); }
+
+   private:
+    template <typename T>
+    bool addOrderToMap(T& map, const Order& order) {
+        // create a new level if it doesn't exist
+        auto [it, inserted] = map.try_emplace(order.price, LevelContainer{});
+        orderIDToMapItMap[order.orderID] = it;
+
+        // insert order into the level
+        // it->second is the container
+        auto levelContainerIt =
+            LevelContainerTraits<LevelContainer>::insert(it->second, order);
+        orderIDToLevelContainerItMap[order.orderID] = levelContainerIt;
+        return true;
     }
 };
 
 template <typename LevelContainer, size_t MAX_DEPTH = 65536>
 class VectorBasedOrderBook : public OrderBook<VectorBasedOrderBook<LevelContainer>> {
    public:
-    std::vector<std::pair<Order::Price, LevelContainer>>
-        bids;  // largest price at the end
-    std::vector<std::pair<Order::Price, LevelContainer>>
-        asks;  // smallest price at the end
+    using Levels = std::vector<std::pair<Order::Price, LevelContainer>>;
+
+    Levels bids;  // largest price at the end
+    Levels asks;  // smallest price at the end
 
     std::unordered_map<Order::OrderID, typename LevelContainer::iterator>
         orderIDToLevelContainerItMap;
-    std::unordered_map<Order::OrderID, typename decltype(bids)::iterator>
-        orderIDToVecItMap;
 
     VectorBasedOrderBook() {
         // reserve memory to avoid runtime reallocation
@@ -196,9 +208,9 @@ class VectorBasedOrderBook : public OrderBook<VectorBasedOrderBook<LevelContaine
 
     bool addOrderImpl(const Order& order) {
         if (order.side == Order::Side::Buy) {
-            addOrder(bids, order, std::less<Order::Price>{});
+            addOrderToVec(bids, order, std::less<Order::Price>{});
         } else {
-            addOrder(asks, order, std::greater<Order::Price>{});
+            addOrderToVec(asks, order, std::greater<Order::Price>{});
         }
         return true;
     }
@@ -211,7 +223,11 @@ class VectorBasedOrderBook : public OrderBook<VectorBasedOrderBook<LevelContaine
 
         auto& levelContainerIt = it->second;
         auto side = levelContainerIt->side;
-        auto vecIt = orderIDToVecItMap[orderID];
+        auto vecIt = side == Order::Side::Buy ? findLevelIt(bids, levelContainerIt->price,
+                                                            std::less<Order::Price>{})
+                                              : findLevelIt(asks, levelContainerIt->price,
+                                                            std::greater<Order::Price>{});
+
         auto& levelContainer = vecIt->second;
 
         // erase order from the level
@@ -225,7 +241,6 @@ class VectorBasedOrderBook : public OrderBook<VectorBasedOrderBook<LevelContaine
 
         // erase order ID from the maps
         orderIDToLevelContainerItMap.erase(orderID);
-        orderIDToVecItMap.erase(orderID);
         return true;
     }
 
@@ -244,7 +259,11 @@ class VectorBasedOrderBook : public OrderBook<VectorBasedOrderBook<LevelContaine
             order.quantity = newQuantity;
             order.createTime = std::chrono::system_clock::now();
 
-            auto& container = orderIDToVecItMap[orderID]->second;
+            auto vecIt =
+                order.side == Order::Side::Buy
+                    ? findLevelIt(bids, order.price, std::less<Order::Price>{})
+                    : findLevelIt(asks, order.price, std::greater<Order::Price>{});
+            auto& container = vecIt->second;
 
             // erase the old iterator
             LevelContainerTraits<LevelContainer>::erase(container, levelContainerIt);
@@ -274,16 +293,19 @@ class VectorBasedOrderBook : public OrderBook<VectorBasedOrderBook<LevelContaine
         return *LevelContainerTraits<LevelContainer>::first(asks.rbegin()->second);
     }
 
-    void printImpl() const {
-        // LOG_INFO("Order Book");
-    }
+    void printImpl() const { LOG_INFO("Order Book"); }
 
    private:
     template <typename T, typename Compare>
-    void addOrder(T& levels, const Order& order, Compare cmp) {
-        auto it = std::lower_bound(
-            levels.begin(), levels.end(), order.price,
+    decltype(auto) findLevelIt(T& levels, Order::Price price, Compare cmp) {
+        return std::lower_bound(
+            levels.begin(), levels.end(), price,
             [cmp](const auto& level, auto price) { return cmp(level.first, price); });
+    }
+
+    template <typename T, typename Compare>
+    void addOrderToVec(T& levels, const Order& order, Compare cmp) {
+        auto it = findLevelIt(levels, order.price, cmp);
 
         if (it != levels.end() && it->first == order.price) {
             // price level exists, insert order into the level
@@ -291,7 +313,6 @@ class VectorBasedOrderBook : public OrderBook<VectorBasedOrderBook<LevelContaine
             auto levelContainerIt =
                 LevelContainerTraits<LevelContainer>::insert(container, order);
             orderIDToLevelContainerItMap[order.orderID] = levelContainerIt;
-            orderIDToVecItMap[order.orderID] = it;
         } else {
             // price level doesn't exist, create a new level
             auto vecIt = levels.insert(it, {order.price, LevelContainer{}});
@@ -299,7 +320,6 @@ class VectorBasedOrderBook : public OrderBook<VectorBasedOrderBook<LevelContaine
             auto levelContainerIt =
                 LevelContainerTraits<LevelContainer>::insert(container, order);
             orderIDToLevelContainerItMap[order.orderID] = levelContainerIt;
-            orderIDToVecItMap[order.orderID] = vecIt;
         }
     }
 };
