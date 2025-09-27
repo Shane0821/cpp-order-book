@@ -6,9 +6,9 @@
 #include <stdexcept>
 #include <unordered_map>
 #include <utility>
+#include <functional>
 
 #include "booktraits.hpp"
-#include "util/logger.h"
 
 template <typename Derived>
 class OrderBook {
@@ -168,7 +168,7 @@ class MapBasedPriceLevelOrderBook
         return *LevelContainerTraits<LevelContainer>::first(asks.begin()->second);
     }
 
-    void printImpl() const { LOG_INFO("Order Book"); }
+    void printImpl() const {}
 
    private:
     template <typename T>
@@ -292,7 +292,7 @@ class VectorBasedOrderBook : public OrderBook<VectorBasedOrderBook<LevelContaine
         return *LevelContainerTraits<LevelContainer>::first(asks.rbegin()->second);
     }
 
-    void printImpl() const { LOG_INFO("Order Book"); }
+    void printImpl() const {}
 
    private:
     template <typename T, typename Compare>
