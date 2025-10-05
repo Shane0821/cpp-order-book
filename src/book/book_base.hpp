@@ -8,8 +8,8 @@
 #include <unordered_map>
 #include <utility>
 
-#include "level_traits.hpp"
 #include "level_info.h"
+#include "level_traits.hpp"
 #include "order.h"
 #include "trade.h"
 
@@ -26,7 +26,7 @@ class L2OrderBook {
         static_assert(std::is_same_v<decltype(order->remainingQuantity_), Quantity>);
         static_assert(std::is_same_v<decltype(order->orderId_), OrderId>);
 
-        if (order->remainingQuantity_ == 0) [[unlikely]] {
+        if (order == nullptr || order->remainingQuantity_ == 0) [[unlikely]] {
             return;
         }
 
@@ -34,6 +34,10 @@ class L2OrderBook {
     }
 
     void cancelOrder(Order* order) {
+        if (order == nullptr) [[unlikely]] {
+            return;
+        }
+        
         static_cast<Derived*>(this)->cancelOrderImpl(order);
     }
 
@@ -59,10 +63,10 @@ class L3OrderBook {
         static_assert(std::is_same_v<decltype(order->price_), Price>);
         static_assert(std::is_same_v<decltype(order->initialQuantity_), Quantity>);
         static_assert(std::is_same_v<decltype(order->remainingQuantity_), Quantity>);
-        static_assert(std::is_same_v<decltype(order.orderId), OrderId>);
+        static_assert(std::is_same_v<decltype(order->orderId_), OrderId>);
 
-        if (order->remainingQuantity_ == 0) [[unlikely]] {
-            return;
+        if (order == nullptr || order->remainingQuantity_ == 0) [[unlikely]] {
+            return false;
         }
 
         return static_cast<Derived*>(this)->addOrderImpl(order);
@@ -70,11 +74,19 @@ class L3OrderBook {
 
     // cancel order by order ID
     bool cancelOrder(Order* order) {
+        if (order == nullptr) [[unlikely]] {
+            return false;
+        }
+
         return static_cast<Derived*>(this)->cancelOrderImpl(order);
     }
 
     // modify order quantity and price
     bool modifyOrder(Order* order, Price newPrice, Quantity newQuantity) {
+        if (order == nullptr) [[unlikely]] {
+            return false;
+        }
+
         return static_cast<Derived*>(this)->modifyOrderImpl(order, newPrice, newQuantity);
     }
 
