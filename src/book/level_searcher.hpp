@@ -8,7 +8,7 @@ struct BinaryLevelSearcher {
     static decltype(auto) findLevelIt(T& levels, Price price, Compare cmp) {
         return std::lower_bound(
             levels.begin(), levels.end(), price,
-            [cmp](const auto& level, auto price) { return cmp(level->price_, price); });
+            [cmp](const auto& level, auto price) { return cmp(level.price_, price); });
     }
 };
 

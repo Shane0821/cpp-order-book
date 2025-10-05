@@ -231,13 +231,13 @@ TYPED_TEST(VectorBasedL2OrderBookTest, AddOrder) {
 
     // Verify bid levels are sorted in descending order (largest at end)
     ASSERT_FALSE(book.bidLevels_.empty());
-    ASSERT_EQ(book.bidLevels_.back().first, 101);  // Highest bid at end
-    ASSERT_EQ(book.bidLevels_.front().first, 99);  // Lowest bid at front
+    ASSERT_EQ(book.bidLevels_.back().price_, 101);  // Highest bid at end
+    ASSERT_EQ(book.bidLevels_.front().price_, 99);  // Lowest bid at front
 
     // Verify ask levels are sorted in ascending order (smallest at end)
     ASSERT_FALSE(book.askLevels_.empty());
-    ASSERT_EQ(book.askLevels_.back().first, 101);   // Lowest ask at end
-    ASSERT_EQ(book.askLevels_.front().first, 103);  // Highest ask at front
+    ASSERT_EQ(book.askLevels_.back().price_, 101);   // Lowest ask at end
+    ASSERT_EQ(book.askLevels_.front().price_, 103);  // Highest ask at front
 }
 
 TYPED_TEST(VectorBasedL2OrderBookTest, CancelOrder) {
@@ -260,9 +260,9 @@ TYPED_TEST(VectorBasedL2OrderBookTest, CancelOrder) {
     // Verify partial cancellation
     bool found100 = false;
     for (const auto& level : book.bidLevels_) {
-        if (level.first == 100) {
+        if (level.price_ == 100) {
             found100 = true;
-            ASSERT_EQ(level.second.quantity_, 500);
+            ASSERT_EQ(level.quantity_, 500);
             break;
         }
     }
@@ -276,7 +276,7 @@ TYPED_TEST(VectorBasedL2OrderBookTest, CancelOrder) {
     // Verify level removed
     found100 = false;
     for (const auto& level : book.bidLevels_) {
-        if (level.first == 100) {
+        if (level.price_ == 100) {
             found100 = true;
             break;
         }
@@ -297,9 +297,9 @@ TYPED_TEST(VectorBasedL2OrderBookTest, AggregateSamePrice) {
 
     // Verify aggregation
     ASSERT_EQ(book.bidLevels_.size(), 1);
-    ASSERT_EQ(book.bidLevels_[0].first, 100);
-    ASSERT_EQ(book.bidLevels_[0].second.quantity_, 1500);
-    ASSERT_EQ(book.bidLevels_[0].second.volume_, 1500 * 100);
+    ASSERT_EQ(book.bidLevels_[0].price_, 100);
+    ASSERT_EQ(book.bidLevels_[0].quantity_, 1500);
+    ASSERT_EQ(book.bidLevels_[0].volume_, 1500 * 100);
 }
 
 TYPED_TEST(VectorBasedL2OrderBookTest, EmptyBook) {
@@ -346,10 +346,10 @@ TYPED_TEST(VectorBasedL2OrderBookTest, ManyLevels) {
 
     // Verify sorting
     for (size_t i = 1; i < book.bidLevels_.size(); ++i) {
-        ASSERT_LT(book.bidLevels_[i - 1].first, book.bidLevels_[i].first);
+        ASSERT_LT(book.bidLevels_[i - 1].price_, book.bidLevels_[i].price_);
     }
 
     for (size_t i = 1; i < book.askLevels_.size(); ++i) {
-        ASSERT_GT(book.askLevels_[i - 1].first, book.askLevels_[i].first);
+        ASSERT_GT(book.askLevels_[i - 1].price_, book.askLevels_[i].price_);
     }
 }

@@ -76,12 +76,11 @@ class MapBasedL2OrderBook : public L2OrderBook<MapBasedL2OrderBook> {
     }
 };
 
-
 template <typename LevelSearcher = BinaryLevelSearcher, size_t MAX_DEPTH = 65536>
 class VectorBasedL2OrderBook
     : public L2OrderBook<VectorBasedL2OrderBook<LevelSearcher, MAX_DEPTH>> {
    public:
-    using LevelInfos = std::vector<std::pair<Price, L2LevelInfo>>;
+    using LevelInfos = std::vector<L2LevelInfo>;
 
     LevelInfos bidLevels_;  // largest price at the end
     LevelInfos askLevels_;  // smallest price at the end
@@ -121,11 +120,11 @@ class VectorBasedL2OrderBook
     void levelRemoveOrder(T& levels, Price price, Quantity quantity, Compare cmp) {
         auto it = LevelSearcher::findLevelIt(levels, price, cmp);
 
-        if (it == levels.end() || it->first != price) [[unlikely]] {
+        if (it == levels.end() || it->price_ != price) [[unlikely]] {
             return;
         }
 
-        auto& info = it->second;
+        auto& info = *it;
         info.quantity_ -= quantity;
         info.volume_ -= price * quantity;
 
@@ -139,14 +138,13 @@ class VectorBasedL2OrderBook
     void levelAddOrder(T& levels, Price price, Quantity quantity, Compare cmp) {
         auto it = LevelSearcher::findLevelIt(levels, price, cmp);
 
-        if (it != levels.end() && it->first == price) [[likely]] {
+        if (it != levels.end() && it->price_ == price) [[likely]] {
             // level exists
-            it->second.quantity_ += quantity;
-            it->second.volume_ += price * quantity;
+            it->quantity_ += quantity;
+            it->volume_ += price * quantity;
         } else {
             // level does not exist
-            levels.insert(it,
-                          std::pair(price, L2LevelInfo{price, quantity, price * quantity}));
+            levels.insert(it, L2LevelInfo{price, quantity, price * quantity});
         }
     }
 };
