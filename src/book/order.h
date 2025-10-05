@@ -22,6 +22,38 @@ struct Order {
     Order(OrderId orderId, Side side, Quantity quantity)
         : Order(orderId, OrderType::Market, side, Constants::InvalidPrice, quantity) {}
 
+    OrderId getOrderId() const { return orderId_; }
+    Side getSide() const { return side_; }
+    Price getPrice() const { return price_; }
+    OrderType getOrderType() const { return type_; }
+    Quantity getInitialQuantity() const { return initialQuantity_; }
+    Quantity getRemainingQuantity() const { return remainingQuantity_; }
+    Quantity getFilledQuantity() const {
+        return getInitialQuantity() - getRemainingQuantity();
+    }
+
+    bool isFilled() const { return getRemainingQuantity() == 0; }
+
+    bool Fill(Quantity quantity) {
+        if (quantity > getRemainingQuantity()) [[unlikely]] {
+            return false;
+        }
+
+        remainingQuantity_ -= quantity;
+        return true;
+    }
+
+    bool toGoodTillCancel(Price price) {
+        if (getOrderType() != OrderType::Market) {
+            // cannot convert market order to gtc
+            return false;
+        }
+
+        price_ = price;
+        type_ = OrderType::GoodTillCancel;
+        return true;
+    }
+
     friend std::ostream& operator<<(std::ostream& os, const Order& order) {
         return os << "OrderID: " << order.orderId_
                   << ", Side: " << (order.side_ == Side::Buy ? "Buy" : "Sell")
@@ -41,5 +73,7 @@ struct Order {
     Price price_{0};
     Timestamp creationTime_{};
 };
+
+using OrderPointer = std::unique_ptr<Order>;
 
 #endif  // _ORDER_H
