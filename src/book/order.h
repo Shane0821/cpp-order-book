@@ -16,7 +16,8 @@ struct Order {
           type_(type),
           initialQuantity_(quantity),
           remainingQuantity_(quantity),
-          price_(price) {}
+          price_(price),
+          creationTime_(std::chrono::high_resolution_clock::now()) {}
 
     Order(OrderId orderId, Side side, Quantity quantity)
         : Order(orderId, OrderType::Market, side, Constants::InvalidPrice, quantity) {}
@@ -38,6 +39,7 @@ struct Order {
     Quantity initialQuantity_{0};
     Quantity remainingQuantity_{0};
     Price price_{0};
+    Timestamp creationTime_{};
 };
 
 #endif  // _ORDER_H
