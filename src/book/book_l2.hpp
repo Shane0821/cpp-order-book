@@ -6,7 +6,7 @@
 #include <unordered_map>
 #include <utility>
 
-#include "book_base.hpp"
+#include "book_l2_base.hpp"
 #include "level_searcher.hpp"
 
 class MapBasedL2OrderBook : public L2OrderBook<MapBasedL2OrderBook> {
