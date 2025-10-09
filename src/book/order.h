@@ -74,6 +74,6 @@ struct Order {
     Timestamp creationTime_{};
 };
 
-using OrderPointer = std::unique_ptr<Order>;
+using OrderPool = ObjectPool<Order>;
 
 #endif  // _ORDER_H
