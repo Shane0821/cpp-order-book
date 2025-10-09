@@ -22,7 +22,7 @@ struct Order {
     Order(OrderId orderId, Side side, Quantity quantity)
         : Order(orderId, OrderType::Market, side, Constants::InvalidPrice, quantity) {}
 
-    OrderId getOrderId() const { return orderId_; }
+    const OrderId& getOrderId() const { return orderId_; }
     Side getSide() const { return side_; }
     Price getPrice() const { return price_; }
     OrderType getOrderType() const { return type_; }
@@ -34,7 +34,7 @@ struct Order {
 
     bool isFilled() const { return getRemainingQuantity() == 0; }
 
-    bool Fill(Quantity quantity) {
+    bool fill(Quantity quantity) {
         if (quantity > getRemainingQuantity()) [[unlikely]] {
             return false;
         }
@@ -45,7 +45,7 @@ struct Order {
 
     bool toGoodTillCancel(Price price) {
         if (getOrderType() != OrderType::Market) {
-            // cannot convert market order to gtc
+            // order cannot have its price adjusted, only market order can
             return false;
         }
 
