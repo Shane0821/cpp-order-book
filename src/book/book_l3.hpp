@@ -1,244 +1,235 @@
 #ifndef _BOOK_L3_HPP
 #define _BOOK_L3_HPP
 
-#include <concepts>
-#include <functional>
-#include <map>
-#include <stdexcept>
-#include <unordered_map>
-#include <utility>
+#include "book_l3_base.hpp"
+#include "level_info.h"
+#include "level_traits.hpp"
+#include "order.h"
+#include "order_modify.h"
+#include "trade.h"
+#include "util/objectpool.hpp"
 
-#include "book_base.hpp"
-#include "level_searcher.hpp"
-
-template <typename LevelContainer>
-class MapBasedL3OrderBook : L3OrderBook<MapBasedL3OrderBook<LevelContainer>> {
+template <typename Derived, typename Base = L3OrderBookBase>
+class L3OrderBook : public L3OrderBookBase {
    public:
-    std::map<Price, LevelContainer, std::greater<Price>> bidLevels_;
-    std::map<Price, LevelContainer, std::less<Price>> askLevels_;
+    using OrderCancelCallback = std::function<void(const Order *)>;
+    using OrderAddCallback = std::function<void(const Order *)>;
 
-    std::unordered_map<Price, typename decltype(bidLevels_)::iterator> priceToBidItMap_;
-    std::unordered_map<Price, typename decltype(askLevels_)::iterator> priceToAskItMap_;
-    std::unordered_map<OrderId, typename LevelContainer::iterator>
-        idToLevelContainerItMap_;
+    L3OrderBook() = default;
+    virtual ~L3OrderBook() = default;
 
-    MapBasedL3OrderBook() = default;
-    ~MapBasedL3OrderBook() = default;
+    // add order to the order book
+    Trades addOrder(Order *order) {
+        // type check
+        static_assert(std::is_same_v<decltype(order->price_), Price>);
+        static_assert(std::is_same_v<decltype(order->initialQuantity_), Quantity>);
+        static_assert(std::is_same_v<decltype(order->remainingQuantity_), Quantity>);
+        static_assert(std::is_same_v<decltype(order->getOrderId()), OrderId>);
 
-    bool addOrderImpl(const Order* order) {
-        if (order->price_ <= 0 || order->remainingQuantity_ <= 0) [[unlikely]] {
-            return false;
+        if (order == nullptr || order->remainingQuantity_ == 0 || order->price_ < 0 ||
+            static_cast<const Derived *>(this)->orderExistsImpl(order->getOrderId()))
+            [[unlikely]] {
+            return {};
         }
 
-        if (idToLevelContainerItMap_.contains(order->orderId_)) [[unlikely]] {
-            return false;
+        if (order->getOrderType() == OrderType::Market) {
+            // the worst price is only used for matching
+            // the actual price executed is on the other side
+            if (order->getSide() == Side::Buy && !isAskEmpty()) {
+                const auto &[worstAskPrice, _] =
+                    static_cast<Derived *>(this)->getWorstAskLevelImpl();
+                order->toGoodTillCancel(worstAskPrice);
+            } else if (order->getSide() == Side::Sell && !isBidEmpty()) {
+                const auto &[worstBidPrice, _] =
+                    static_cast<Derived *>(this)->getWorstBidLevelImpl();
+                order->toGoodTillCancel(worstBidPrice);
+            } else {
+                return {};
+            }
         }
 
-        if (order->side_ == Side::Buy) {
-            idToLevelContainerItMap_[order->orderId_] =
-                addOrderToMap(bidLevels_, priceToBidItMap_, order);
+        if (order->getOrderType() == OrderType::FillAndKill &&
+            !canMatch(order->getSide(), order->getPrice())) {
+            return {};
+        }
+
+        if (order->getOrderType() == OrderType::FillOrKill &&
+            !canFullyFill(order->getSide(), order->getPrice(),
+                          order->getInitialQuantity())) {
+            return {};
+        }
+
+        static_cast<Derived *>(this)->addOrderImpl(order);
+        onOrderAdded(order);
+        return MatchOrders();
+    }
+
+    // cancel order by order ID
+    void cancelOrder(const OrderId &orderId) {
+        if (!static_cast<Derived *>(this)->orderExistsImpl(orderId)) [[unlikely]] {
+            return;
+        }
+        Order *order = static_cast<Derived *>(this)->cancelOrderImpl(orderId);
+        onOrderCancelled(order);
+    }
+
+    template <typename OrderIds>
+        requires std::same_as<OrderIds::value_type, std::string>
+    void cancelOrders(OrderIds &&orderIds) {
+        for (const auto &orderId : orderIds) {
+            cancelOrder(orderId);
+        }
+    }
+
+    Trades modifyOrder(const OrderId &orderId, const OrderModify &modify) {
+        if (!static_cast<Derived *>(this)->orderExistsImpl(orderId)) [[unlikely]] {
+            return {};
+        }
+        Order *order = static_cast<Derived *>(this)->cancelOrderImpl(orderId);
+        modify.toOrderPointer(order);
+        return static_cast<Derived *>(this)->addOrderImpl(order);
+    }
+
+    size_t getOrderCount() const {
+        return static_cast<const Derived *>(this)->getOrderCountImpl();
+    }
+
+    void print() const { static_cast<const Derived *>(this)->printImpl(); }
+
+   protected:
+    // print the order book
+    bool isBidEmpty() const {
+        return static_cast<const Derived *>(this)->bidLevels_.empty();
+    }
+    bool isAskEmpty() const {
+        return static_cast<const Derived *>(this)->askLevels_.empty();
+    }
+
+    // void PruneGoodForDayOrders();
+
+    bool canFullyFill(Side side, Price price, Quantity quantity) const {
+        if (!canMatch(side, price)) return false;
+
+        Price threshold;
+
+        if (side == Side::Buy) {
+            const auto &[askPrice, _] =
+                static_cast<Derived *>(this)->getBestAskLevelImpl();
+            threshold = askPrice;
         } else {
-            idToLevelContainerItMap_[order->orderId_] =
-                addOrderToMap(askLevels_, priceToAskItMap_, order);
+            const auto [bidPrice, _] =
+                static_cast<Derived *>(this)->getBestBidLevelImpl();
+            threshold = bidPrice;
         }
 
-        return true;
+        for (const auto &[levelPrice, l2Info] : data_) {
+            if ((side == Side::Buy && levelPrice > price) ||
+                (side == Side::Sell && levelPrice < price))
+                break;
+
+            if (quantity <= l2Info.quantity_) return true;
+
+            quantity -= l2Info.quantity_;
+        }
+
+        return false;
     }
 
-    bool cancelOrderImpl(const Order* order) {
-        if (!idToLevelContainerItMap_.contains(order->orderId_)) [[unlikely]] {
-            return false;
-        }
-
-        auto levelContainerIt = idToLevelContainerItMap_[order->orderId_];
-
-        if (order->side == Side::Buy) {
-            cancelOrderFromMap(bidLevels_, priceToBidItMap_, levelContainerIt, order);
+    bool canMatch(Side side, Price price) const {
+        if (side == Side::Buy) {
+            if (isAskEmpty()) [[unlikely]] {
+                return false;
+            }
+            const auto &[askPrice, _] =
+                static_cast<Derived *>(this)->getBestAskLevelImpl();
+            return askPrice <= price;
         } else {
-            cancelOrderFromMap(askLevels_, priceToAskItMap_, levelContainerIt, order);
-        }
-        // erase order ID
-        idToLevelContainerItMap_.erase(order->orderId_);
-
-        return true;
-    }
-
-    bool modifyOrderImpl(Order* order, Price newPrice, Quantity newQuantity) {
-        if (!idToLevelContainerItMap_.contains(order->orderId_)) [[unlikely]] {
-            return false;
-        }
-
-        // cancel the order
-        cancelOrder(order);
-        // update the order
-        order->initialQuantity_ = newQuantity;
-        order->remainingQuantity_ = std::min(order->remainingQuantity_, newQuantity);
-        order->price_ = newPrice;
-        // add the order
-        addOrder(order);
-        return true;
-    }
-
-    Order* getBestBidImpl() const {
-        return LevelContainerTraits<LevelContainer>::first(bidLevels_.begin()->second);
-    }
-
-    Order* getBestAskImpl() const {
-        return LevelContainerTraits<LevelContainer>::first(askLevels_.begin()->second);
-    }
-
-    void printImpl() const {}
-
-   private:
-    template <typename T, typename M>
-    decltype(auto) addOrderToMap(T& levels, M& price_map, const Order* order) {
-        if (price_map.contains(order->price_)) [[likely]] {
-            auto& levelContainer = price_map[order->price_]->second;
-            return LevelContainerTraits<LevelContainer>::insert(levelContainer, order);
-        }
-        // create a new level
-        auto [it, inserted] = levels.emplace(order.price_, LevelContainer{});
-        price_map[order->price_] = it;
-
-        // insert order into the level
-        // it->second is the container
-        return LevelContainerTraits<LevelContainer>::insert(it->second, order);
-    }
-
-    template <typename T, typename M, typename Iterator>
-    void cancelOrderFromMap(T& levels, M& price_map, Iterator levelContainerIt,
-                            const Order* order) {
-        auto levelIt = price_map[order->price_];
-        auto& levelContainer = levelIt->second;
-        // erase order from the level
-        LevelContainerTraits<LevelContainer>::erase(levelContainer, levelContainerIt);
-
-        // erase the level if it's empty
-        if (LevelContainerTraits<LevelContainer>::empty(levelContainer)) [[unlikely]] {
-            levels.erase(levelIt);
-            price_map.erase(order->price_);
+            if (isBidEmpty()) [[unlikely]] {
+                return false;
+            }
+            const auto &[bidPrice, _] =
+                static_cast<Derived *>(this)->getBestBidLevelImpl();
+            return bidPrice >= price;
         }
     }
-};
 
-template <typename LevelContainer, typename LevelSearcher = BinaryLevelSearcher,
-          size_t MAX_DEPTH = 65536>
-class VectorBasedL3OrderBook
-    : public L3OrderBook<VectorBasedOrderBook<LevelContainer, LevelSearcher, MAX_DEPTH>> {
-   public:
-    using Levels = std::vector<L3LevelInfo<LevelContainer>>;
+    Trades MatchOrders() {
+        Trades trades;
 
-    Levels bidLevels_;  // largest price at the end
-    Levels askLevels_;  // smallest price at the end
+        while (true) {
+            if (isBidEmpty() || isAskEmpty()) break;
 
-    std::unordered_map<OrderId, typename LevelContainer::iterator>
-        orderIDToLevelContainerItMap_;
+            auto &[bidPrice, bids] = static_cast<Derived *>(this)->getBestBidLevelImpl();
+            auto &[askPrice, asks] = static_cast<Derived *>(this)->getBestAskLevelImpl();
 
-    VectorBasedOrderBook() {
-        // reserve memory to avoid runtime reallocation
-        bidLevels_.reserve(MAX_DEPTH);
-        askLevels_.reserve(MAX_DEPTH);
-    }
+            // no cross
+            if (bidPrice < askPrice) break;
 
-    ~VectorBasedOrderBook() = default;
+            using BidLevelContainer = std::remove_reference_t<decltype(bids)>;
+            using AskLevelContainer = std::remove_reference_t<decltype(asks)>;
 
-    bool addOrderImpl(Order* order) {
-        if (order->side_ == Side::Buy) {
-            orderIDToLevelContainerItMap_[order->orderId_] =
-                levelAddOrder(bidLevels_, order, std::less<Price>{});
-        } else {
-            orderIDToLevelContainerItMap_[order->orderId_] =
-                levelAddOrder(askLevels_, order, std::greater<Price>{});
-        }
-        return true;
-    }
+            while (!bids.empty() && !asks.empty()) {
+                auto bidIt = LevelContainerTraits<BidLevelContainer>::first(bids);
+                auto askIt = LevelContainerTraits<AskLevelContainer>::first(asks);
 
-    bool cancelOrderImpl(Order* order) {
-        auto it = orderIDToLevelContainerItMap_.find(order->orderId_);
-        if (it == orderIDToLevelContainerItMap_.end()) [[unlikely]] {
-            return false;
-        }
+                auto bid = *bidIt;
+                auto ask = *askIt;
 
-        auto& levelContainerIt = it->second;
+                Quantity quantity =
+                    std::min(bid->getRemainingQuantity(), ask->getRemainingQuantity());
 
-        if (order->side_ == Side::Buy) {
-            levelRemoveOrder(bidLevels_, levelContainerIt, order, std::less<Price>{});
-        } else {
-            levelRemoveOrder(askLevels_, levelContainerIt, order, std::greater<Price>{});
-        }
+                bid->fill(quantity);
+                ask->fill(quantity);
 
-        // erase order ID from the hashmap
-        orderIDToLevelContainerItMap_.erase(order->orderId_);
-        return true;
-    }
+                trades.emplace_back(TradeInfo{bid->getOrderId(), bidPrice, quantity},
+                                    TradeInfo{ask->getOrderId(), askPrice, quantity});
 
-    bool modifyOrderImpl(Order* order, Price newPrice, Quantity newQuantity) {
-        if (!orderIDToLevelContainerItMap_.contains(order->orderId_)) [[unlikely]] {
-            return false;
+                // update callback
+                onOrderMatched(bidPrice, quantity, bid->isFilled());
+                onOrderMatched(askPrice, quantity, ask->isFilled());
+
+                if (bid->isFilled()) {
+                    static_cast<Derived *>(this)->levelCancelOrderImpl(bids, bidIt);
+                    // TODO: recycle bid
+                }
+
+                if (ask->isFilled()) {
+                    static_cast<Derived *>(this)->levelCancelOrderImpl(asks, askIt);
+                    // TODO: recycle ask
+                }
+            }
+
+            if (LevelContainerTraits<BidLevelContainer>::empty(bids)) {
+                static_cast<Derived *>(this)->removeEmptyBidLevelImpl(bidPrice);
+            }
+
+            if (LevelContainerTraits<AskLevelContainer>::empty(asks)) {
+                static_cast<Derived *>(this)->removeEmptyAskLevelImpl(askPrice);
+            }
         }
 
-        // cancel the order
-        cancelOrderImpl(order);
-        // update the order
-        order->initialQuantity_ = newQuantity;
-        order->remainingQuantity_ = std::min(order->remainingQuantity_, newQuantity);
-        order->price_ = newPrice;
-        // add the order
-        addOrderImpl(order);
-        return true;
-    }
-
-    const Order* getBestBidImpl() const {
-        return LevelContainerTraits<LevelContainer>::first(
-            bidLevels_.rbegin()->levelContainer_);
-    }
-    const Order* getBestAskImpl() const {
-        return LevelContainerTraits<LevelContainer>::first(
-            askLevels_.rbegin()->levelContainer_);
-    }
-    Order* getBestBidImpl() {
-        return LevelContainerTraits<LevelContainer>::first(
-            bidLevels_.rbegin()->levelContainer_);
-    }
-    Order* getBestAskImpl() {
-        return LevelContainerTraits<LevelContainer>::first(
-            askLevels_.rbegin()->levelContainer_);
-    }
-
-    void printImpl() const {}
-
-   private:
-    template <typename T, typename Compare>
-    void levelAddOrder(T& levels, Order* order, Compare cmp) {
-        auto it = LevelSearcher::findLevelIt(levels, order->price_, cmp);
-
-        if (it != levels.end() && it->price_ == order->price_) [[likely]] {
-            // price level exists, insert order into the level
-            return LevelContainerTraits<LevelContainer>::insert(it->levelContainer_,
-                                                                order);
+        if (!isBidEmpty()) {
+            Order *order = static_cast<Derived *>(this)->getBestBidImpl();
+            if (order->getOrderType() == OrderType::FillAndKill) {
+                cancelOrder(order->getOrderId());
+            }
         }
 
-        // price level doesn't exist, create a new level
-        auto vecIt = levels.insert(it, L3LevelInfo{order->price_, LevelContainer{}});
-        return LevelContainerTraits<LevelContainer>::insert(vecIt->levelContainer_,
-                                                            order);
-    }
-
-    template <typanem T, typename Iterator, typename Compare>
-    void levelRemoveOrder(T& levels, Iterator levelContainerIt, Order* order,
-                          Compare cmp) {
-        auto vecIt = LevelSearcher::findLevelIt(levels, order->price_, cmp);
-        auto& levelContainer = vecIt->levelContainer_;
-
-        // erase order from the level
-        LevelContainerTraits<LevelContainer>::erase(levelContainer, levelContainerIt);
-
-        // erase the level if it's empty
-        if (LevelContainerTraits<LevelContainer>::empty(levelContainer)) [[unlikely]] {
-            // erase the level from the vector
-            levels.erase(vecIt);
+        if (!isAskEmpty()) {
+            Order *order = static_cast<Derived *>(this)->getBestAskImpl();
+            if (order->getOrderType() == OrderType::FillAndKill) {
+                cancelOrder(order->getOrderId());
+            }
         }
+        return trades;
     }
+
+    void onOrderCancelled(const Order *order) {}
+    void onOrderAdded(const Order *order) {}
+    void onOrderMatched(Price price, Quantity quantity, bool isFullyFilled) {}
+
+    OrderCancelCallback orderCancelCallback_{nullptr};
+    OrderAddCallback orderAddCallback_{nullptr};
 };
 
 #endif  // _BOOK_L3_HPP
