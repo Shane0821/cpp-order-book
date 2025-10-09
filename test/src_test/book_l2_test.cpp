@@ -1,6 +1,7 @@
-#include "book/book_l2.hpp"
-
 #include <gtest/gtest.h>
+
+#include "book/book_l2_map.hpp"
+#include "book/book_l2_vector.hpp"
 
 class MapBasedL2OrderBookTest : public ::testing::Test {
    protected:
@@ -32,8 +33,8 @@ TEST_F(MapBasedL2OrderBookTest, AddOrder) {
     book.addOrder(&sellOrder101);
 
     // Verify bid levels are sorted in descending order
-    ASSERT_FALSE(book.bidLevels_.empty());
-    auto bidIt = book.bidLevels_.begin();
+    ASSERT_FALSE(book.getBidLevels().empty());
+    auto bidIt = book.getBidLevels().begin();
     ASSERT_EQ(bidIt->first, 101);  // Highest bid first
     bidIt++;
     ASSERT_EQ(bidIt->first, 100);
@@ -41,8 +42,8 @@ TEST_F(MapBasedL2OrderBookTest, AddOrder) {
     ASSERT_EQ(bidIt->first, 99);
 
     // Verify ask levels are sorted in ascending order
-    ASSERT_FALSE(book.askLevels_.empty());
-    auto askIt = book.askLevels_.begin();
+    ASSERT_FALSE(book.getAskLevels().empty());
+    auto askIt = book.getAskLevels().begin();
     ASSERT_EQ(askIt->first, 101);  // Lowest ask first
     askIt++;
     ASSERT_EQ(askIt->first, 102);
@@ -60,8 +61,8 @@ TEST_F(MapBasedL2OrderBookTest, CancelOrder) {
     book.addOrder(&sellOrder102);
 
     // Verify initial state
-    ASSERT_EQ(book.bidLevels_.size(), 2);
-    ASSERT_EQ(book.askLevels_.size(), 1);
+    ASSERT_EQ(book.getBidLevels().size(), 2);
+    ASSERT_EQ(book.getAskLevels().size(), 1);
 
     // Cancel buy order
     Order cancelBuy100 = buyOrder100;
@@ -69,8 +70,8 @@ TEST_F(MapBasedL2OrderBookTest, CancelOrder) {
     book.cancelOrder(&cancelBuy100);
 
     // Verify partial cancellation
-    auto bidIt = book.bidLevels_.find(100);
-    ASSERT_NE(bidIt, book.bidLevels_.end());
+    auto bidIt = book.getBidLevels().find(100);
+    ASSERT_NE(bidIt, book.getBidLevels().end());
     ASSERT_EQ(bidIt->second.quantity_, 500);  // Remaining quantity
 
     // Cancel entire order
@@ -79,9 +80,9 @@ TEST_F(MapBasedL2OrderBookTest, CancelOrder) {
     book.cancelOrder(&fullCancelBuy100);
 
     // Verify level removed when quantity reaches 0
-    bidIt = book.bidLevels_.find(100);
-    ASSERT_EQ(bidIt, book.bidLevels_.end());
-    ASSERT_EQ(book.bidLevels_.size(), 1);
+    bidIt = book.getBidLevels().find(100);
+    ASSERT_EQ(bidIt, book.getBidLevels().end());
+    ASSERT_EQ(book.getBidLevels().size(), 1);
 }
 
 // Test quantity aggregation at same price level for MapBasedL2OrderBook
@@ -96,9 +97,9 @@ TEST_F(MapBasedL2OrderBookTest, AggregateSamePrice) {
     book.addOrder(&buyOrder100_2);
 
     // Verify aggregation
-    ASSERT_EQ(book.bidLevels_.size(), 1);
-    auto bidIt = book.bidLevels_.find(100);
-    ASSERT_NE(bidIt, book.bidLevels_.end());
+    ASSERT_EQ(book.getBidLevels().size(), 1);
+    auto bidIt = book.getBidLevels().find(100);
+    ASSERT_NE(bidIt, book.getBidLevels().end());
     ASSERT_EQ(bidIt->second.quantity_, 1500);
     ASSERT_EQ(bidIt->second.volume_, 1500 * 100);
 }
@@ -158,8 +159,8 @@ TEST_F(MapBasedL2OrderBookTest, MixedOperations) {
         book.addOrder(&order);
     }
 
-    ASSERT_EQ(book.bidLevels_.size(), 3);
-    ASSERT_EQ(book.askLevels_.size(), 3);
+    ASSERT_EQ(book.getBidLevels().size(), 3);
+    ASSERT_EQ(book.getAskLevels().size(), 3);
 
     // Cancel some orders in mixed order
     std::vector<Order> cancels = {
@@ -175,20 +176,20 @@ TEST_F(MapBasedL2OrderBookTest, MixedOperations) {
         book.cancelOrder(&cancel);
     }
 
-    ASSERT_EQ(book.bidLevels_.size(), 2);  // 100, 101(partial)
-    ASSERT_EQ(book.askLevels_.size(), 2);  // 101, 103
+    ASSERT_EQ(book.getBidLevels().size(), 2);  // 100, 101(partial)
+    ASSERT_EQ(book.getAskLevels().size(), 2);  // 101, 103
 
     // Verify remaining quantities
-    auto bid100It = book.bidLevels_.find(100);
-    ASSERT_NE(bid100It, book.bidLevels_.end());
+    auto bid100It = book.getBidLevels().find(100);
+    ASSERT_NE(bid100It, book.getBidLevels().end());
     ASSERT_EQ(bid100It->second.quantity_, 1000);
 
-    auto bid101It = book.bidLevels_.find(101);
-    ASSERT_NE(bid101It, book.bidLevels_.end());
+    auto bid101It = book.getBidLevels().find(101);
+    ASSERT_NE(bid101It, book.getBidLevels().end());
     ASSERT_EQ(bid101It->second.quantity_, 400);  // 800 - 400
 
-    auto ask101It = book.askLevels_.find(101);
-    ASSERT_NE(ask101It, book.askLevels_.end());
+    auto ask101It = book.getAskLevels().find(101);
+    ASSERT_NE(ask101It, book.getAskLevels().end());
     ASSERT_EQ(ask101It->second.quantity_, 300);
 }
 
@@ -230,14 +231,14 @@ TYPED_TEST(VectorBasedL2OrderBookTest, AddOrder) {
     book.addOrder(&this->sellOrder101);
 
     // Verify bid levels are sorted in descending order (largest at end)
-    ASSERT_FALSE(book.bidLevels_.empty());
-    ASSERT_EQ(book.bidLevels_.back().price_, 101);  // Highest bid at end
-    ASSERT_EQ(book.bidLevels_.front().price_, 99);  // Lowest bid at front
+    ASSERT_FALSE(book.getBidLevels().empty());
+    ASSERT_EQ(book.getBidLevels().back().price_, 101);  // Highest bid at end
+    ASSERT_EQ(book.getBidLevels().front().price_, 99);  // Lowest bid at front
 
     // Verify ask levels are sorted in ascending order (smallest at end)
-    ASSERT_FALSE(book.askLevels_.empty());
-    ASSERT_EQ(book.askLevels_.back().price_, 101);   // Lowest ask at end
-    ASSERT_EQ(book.askLevels_.front().price_, 103);  // Highest ask at front
+    ASSERT_FALSE(book.getAskLevels().empty());
+    ASSERT_EQ(book.getAskLevels().back().price_, 101);   // Lowest ask at end
+    ASSERT_EQ(book.getAskLevels().front().price_, 103);  // Highest ask at front
 }
 
 TYPED_TEST(VectorBasedL2OrderBookTest, CancelOrder) {
@@ -249,8 +250,8 @@ TYPED_TEST(VectorBasedL2OrderBookTest, CancelOrder) {
     book.addOrder(&this->sellOrder102);
 
     // Verify initial state
-    ASSERT_EQ(book.bidLevels_.size(), 2);
-    ASSERT_EQ(book.askLevels_.size(), 1);
+    ASSERT_EQ(book.getBidLevels().size(), 2);
+    ASSERT_EQ(book.getAskLevels().size(), 1);
 
     // Cancel partial buy order
     Order cancelBuy100 = this->buyOrder100;
@@ -259,7 +260,7 @@ TYPED_TEST(VectorBasedL2OrderBookTest, CancelOrder) {
 
     // Verify partial cancellation
     bool found100 = false;
-    for (const auto& level : book.bidLevels_) {
+    for (const auto& level : book.getBidLevels()) {
         if (level.price_ == 100) {
             found100 = true;
             ASSERT_EQ(level.quantity_, 500);
@@ -275,14 +276,14 @@ TYPED_TEST(VectorBasedL2OrderBookTest, CancelOrder) {
 
     // Verify level removed
     found100 = false;
-    for (const auto& level : book.bidLevels_) {
+    for (const auto& level : book.getBidLevels()) {
         if (level.price_ == 100) {
             found100 = true;
             break;
         }
     }
     ASSERT_FALSE(found100);
-    ASSERT_EQ(book.bidLevels_.size(), 1);
+    ASSERT_EQ(book.getBidLevels().size(), 1);
 }
 
 TYPED_TEST(VectorBasedL2OrderBookTest, AggregateSamePrice) {
@@ -296,10 +297,10 @@ TYPED_TEST(VectorBasedL2OrderBookTest, AggregateSamePrice) {
     book.addOrder(&buyOrder100_2);
 
     // Verify aggregation
-    ASSERT_EQ(book.bidLevels_.size(), 1);
-    ASSERT_EQ(book.bidLevels_[0].price_, 100);
-    ASSERT_EQ(book.bidLevels_[0].quantity_, 1500);
-    ASSERT_EQ(book.bidLevels_[0].volume_, 1500 * 100);
+    ASSERT_EQ(book.getBidLevels().size(), 1);
+    ASSERT_EQ(book.getBidLevels()[0].price_, 100);
+    ASSERT_EQ(book.getBidLevels()[0].quantity_, 1500);
+    ASSERT_EQ(book.getBidLevels()[0].volume_, 1500 * 100);
 }
 
 TYPED_TEST(VectorBasedL2OrderBookTest, EmptyBook) {
@@ -341,15 +342,15 @@ TYPED_TEST(VectorBasedL2OrderBookTest, ManyLevels) {
         book.addOrder(&order);
     }
 
-    ASSERT_EQ(book.bidLevels_.size(), NUM_LEVELS);
-    ASSERT_EQ(book.askLevels_.size(), NUM_LEVELS);
+    ASSERT_EQ(book.getBidLevels().size(), NUM_LEVELS);
+    ASSERT_EQ(book.getAskLevels().size(), NUM_LEVELS);
 
     // Verify sorting
-    for (size_t i = 1; i < book.bidLevels_.size(); ++i) {
-        ASSERT_LT(book.bidLevels_[i - 1].price_, book.bidLevels_[i].price_);
+    for (size_t i = 1; i < book.getBidLevels().size(); ++i) {
+        ASSERT_LT(book.getBidLevels()[i - 1].price_, book.getBidLevels()[i].price_);
     }
 
-    for (size_t i = 1; i < book.askLevels_.size(); ++i) {
-        ASSERT_GT(book.askLevels_[i - 1].price_, book.askLevels_[i].price_);
+    for (size_t i = 1; i < book.getAskLevels().size(); ++i) {
+        ASSERT_GT(book.getAskLevels()[i - 1].price_, book.getAskLevels()[i].price_);
     }
 }
