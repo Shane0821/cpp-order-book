@@ -11,6 +11,12 @@ class L2OrderBookBase {
 
     void cancelOrderImpl(Side side, Price price, Quantity quantity);
 
+    decltype(auto) bidBegin();
+    decltype(auto) askBegin();
+
+    decltype(auto) bidEnd();
+    decltype(auto) askEnd();
+
     void printImpl();
 };
 

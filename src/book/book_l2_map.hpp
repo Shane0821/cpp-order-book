@@ -43,7 +43,13 @@ class MapBasedL2OrderBook : public L2OrderBook<MapBasedL2OrderBook> {
 
     void printImpl() const {}
 
-   protected:
+    decltype(auto) bidBegin() { return bidLevels_.begin(); }
+    decltype(auto) askBegin() { return askLevels_.begin(); }
+
+    decltype(auto) bidEnd() { return bidLevels_.end(); }
+    decltype(auto) askEnd() { return askLevels_.end(); }
+
+   private:
     template <typename M, typename T>
     void levelAdd(M& price2levelItMap, T& levels, Price price, Quantity quantity) {
         // create a new level if it doesn't exist

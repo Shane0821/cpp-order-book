@@ -54,6 +54,12 @@ class VectorBasedL2OrderBook
 
     void printImpl() const {}
 
+    decltype(auto) bidBegin() { return bidLevels_.rbegin(); }
+    decltype(auto) askBegin() { return askLevels_.rbegin(); }
+
+    decltype(auto) bidEnd() { return bidLevels_.rend(); }
+    decltype(auto) askEnd() { return askLevels_.rend(); }
+
    private:
     template <typename T, typename Compare>
     void levelRemove(T& levels, Price price, Quantity quantity, Compare cmp) {
