@@ -10,7 +10,7 @@ class L3OrderBookBase {
     Order *cancelOrderImpl(const OrderId &orderId);
 
     template <typename LevelContainer>
-    void levelCancelOrderImpl(LevelContainer &levelContainer,
+    void levelRemoveOrderImpl(LevelContainer &levelContainer,
                               typename LevelContainer::iterator levelContainerIt);
 
     void removeEmptyBidLevelImpl(Price price);
