@@ -5,6 +5,7 @@
 #include "level_info.h"
 #include "level_traits.hpp"
 #include "order.h"
+#include "order_validate.h"
 #include "trade.h"
 
 template <typename Derived, typename Base = L2OrderBookBase>
@@ -14,13 +15,7 @@ class L2OrderBook : public Base {
     virtual ~L2OrderBook() = default;
 
     void addOrder(const Order* order) {
-        // type check
-        static_assert(std::is_same_v<decltype(order->price_), Price>);
-        static_assert(std::is_same_v<decltype(order->initialQuantity_), Quantity>);
-        static_assert(std::is_same_v<decltype(order->remainingQuantity_), Quantity>);
-
-        if (order == nullptr || order->remainingQuantity_ == 0 || order->price_ < 0)
-            [[unlikely]] {
+        if (!OrderValidate::validte(order)) [[unlikely]] {
             return;
         }
 
@@ -28,7 +23,7 @@ class L2OrderBook : public Base {
     }
 
     void cancelOrder(const Order* order) {
-        if (order == nullptr || order->price_ < 0) [[unlikely]] {
+        if (!OrderValidate::validte(order)) [[unlikely]] {
             return;
         }
 
