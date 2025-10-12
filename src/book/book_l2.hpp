@@ -53,7 +53,7 @@ class L2OrderBook : public Base {
     }
 
     void forEachBidLevel(Price pmin, Price pmax,
-                         const std::function<bool(const L2LevelInfo&)>& cb) const {
+                         const std::function<bool(const L2LevelInfo&)>& cb) {
         for (auto it = static_cast<Derived*>(this)->bidBegin();
              it != static_cast<Derived*>(this)->bidEnd(); ++it) {
             const auto& [price, info] = *it;
@@ -64,7 +64,7 @@ class L2OrderBook : public Base {
     }
 
     void forEachAskLevel(Price pmin, Price pmax,
-                         const std::function<bool(const L2LevelInfo&)>& cb) const {
+                         const std::function<bool(const L2LevelInfo&)>& cb) {
         for (auto it = static_cast<Derived*>(this)->bidBegin();
              it != static_cast<Derived*>(this)->bidEnd(); ++it) {
             const auto& [price, info] = *it;
