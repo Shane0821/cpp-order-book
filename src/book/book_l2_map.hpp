@@ -15,21 +15,29 @@ class MapBasedL2OrderBook : public L2OrderBook<MapBasedL2OrderBook> {
    protected:
     void addOrderImpl(const Order* order) {
         if (order->side_ == Side::Buy) {
-            levelAddOrder(price2BidLevelIterMap_, bidLevels_, order->price_,
-                          order->remainingQuantity_);
+            levelAdd(price2BidLevelIterMap_, bidLevels_, order->price_,
+                     order->remainingQuantity_);
         } else {
-            levelAddOrder(price2AskLevelIterMap_, askLevels_, order->price_,
-                          order->remainingQuantity_);
+            levelAdd(price2AskLevelIterMap_, askLevels_, order->price_,
+                     order->remainingQuantity_);
         }
     }
 
     void cancelOrderImpl(const Order* order) {
         if (order->side_ == Side::Buy) {
-            levelRemoveOrder(price2BidLevelIterMap_, bidLevels_, order->price_,
-                             order->remainingQuantity_);
+            levelRemove(price2BidLevelIterMap_, bidLevels_, order->price_,
+                        order->remainingQuantity_);
         } else {
-            levelRemoveOrder(price2AskLevelIterMap_, askLevels_, order->price_,
-                             order->remainingQuantity_);
+            levelRemove(price2AskLevelIterMap_, askLevels_, order->price_,
+                        order->remainingQuantity_);
+        }
+    }
+
+    void cancelOrderImpl(Side side, Price price, Quantity quantity) {
+        if (side == Side::Buy) {
+            levelRemove(price2BidLevelIterMap_, bidLevels_, price, quantity);
+        } else {
+            levelRemove(price2AskLevelIterMap_, askLevels_, price, quantity);
         }
     }
 
@@ -37,7 +45,7 @@ class MapBasedL2OrderBook : public L2OrderBook<MapBasedL2OrderBook> {
 
    protected:
     template <typename M, typename T>
-    void levelAddOrder(M& price2levelItMap, T& levels, Price price, Quantity quantity) {
+    void levelAdd(M& price2levelItMap, T& levels, Price price, Quantity quantity) {
         // create a new level if it doesn't exist
         if (price2levelItMap.contains(price)) [[likely]] {
             auto& info = price2levelItMap[price]->second;
@@ -51,8 +59,7 @@ class MapBasedL2OrderBook : public L2OrderBook<MapBasedL2OrderBook> {
     }
 
     template <typename M, typename T>
-    void levelRemoveOrder(M& price2levelItMap, T& levels, Price price,
-                          Quantity quantity) {
+    void levelRemove(M& price2levelItMap, T& levels, Price price, Quantity quantity) {
         if (!price2levelItMap.contains(price)) [[unlikely]] {
             return;
         }

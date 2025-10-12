@@ -26,21 +26,29 @@ class VectorBasedL2OrderBook
    protected:
     void addOrderImpl(const Order* order) {
         if (order->side_ == Side::Buy) {
-            levelAddOrder(bidLevels_, order->price_, order->remainingQuantity_,
+            levelAdd(bidLevels_, order->price_, order->remainingQuantity_,
                           std::less<Price>{});
         } else {
-            levelAddOrder(askLevels_, order->price_, order->remainingQuantity_,
+            levelAdd(askLevels_, order->price_, order->remainingQuantity_,
                           std::greater<Price>{});
         }
     }
 
     void cancelOrderImpl(const Order* order) {
         if (order->side_ == Side::Buy) {
-            levelRemoveOrder(bidLevels_, order->price_, order->remainingQuantity_,
+            levelRemove(bidLevels_, order->price_, order->remainingQuantity_,
                              std::less<Price>{});
         } else {
-            levelRemoveOrder(askLevels_, order->price_, order->remainingQuantity_,
+            levelRemove(askLevels_, order->price_, order->remainingQuantity_,
                              std::greater<Price>{});
+        }
+    }
+
+    void cancelOrderImpl(Side side, Price price, Quantity quantity) {
+        if (side == Side::Buy) {
+            levelRemove(bidLevels_, price, quantity, std::less<Price>{});
+        } else {
+            levelRemove(askLevels_, price, quantity, std::greater<Price>{});
         }
     }
 
@@ -48,7 +56,7 @@ class VectorBasedL2OrderBook
 
    private:
     template <typename T, typename Compare>
-    void levelRemoveOrder(T& levels, Price price, Quantity quantity, Compare cmp) {
+    void levelRemove(T& levels, Price price, Quantity quantity, Compare cmp) {
         auto it = LevelSearcher::findLevelIt(levels, price, cmp);
 
         if (it == levels.end() || it->price_ != price) [[unlikely]] {
@@ -66,7 +74,7 @@ class VectorBasedL2OrderBook
     }
 
     template <typename T, typename Compare>
-    void levelAddOrder(T& levels, Price price, Quantity quantity, Compare cmp) {
+    void levelAdd(T& levels, Price price, Quantity quantity, Compare cmp) {
         auto it = LevelSearcher::findLevelIt(levels, price, cmp);
 
         if (it != levels.end() && it->price_ == price) [[likely]] {

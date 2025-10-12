@@ -35,6 +35,14 @@ class L2OrderBook : public Base {
         static_cast<Derived*>(this)->cancelOrderImpl(order);
     }
 
+    void cancelOrder(Side side, Price price, Quantity quantity) {
+        if (price <= 0 || quantity <= 0) [[unlikely]] {
+            return;
+        }
+
+        static_cast<Derived*>(this)->cancelOrderImpl(side, price, quantity);
+    }
+
     const auto& getBidLevels() const {
         return static_cast<const Derived*>(this)->bidLevels_;
     }

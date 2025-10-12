@@ -7,7 +7,9 @@ class L2OrderBookBase {
    protected:
     void addOrderImpl(const Order* order);
 
-    void cancelOrder(const Order* order);
+    void cancelOrderImpl(const Order* order);
+
+    void cancelOrderImpl(Side side, Price price, Quantity quantity);
 
     void printImpl();
 };
