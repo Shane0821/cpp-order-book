@@ -7,8 +7,9 @@
 #include "level_searcher.hpp"
 
 // NOTE: do not use vector for level container (because of it invalidation)
-template <typename LevelContainer, typename L2Book>
-    requires std::same_as<typename LevelContainer::value_type, Order*>
+template <LevelContainerBase LevelContainer, typename L2BookInternal = MapBasedL2OrderBook>
+    requires std::same_as<typename LevelContainer::value_type, Order*> &&
+             std::default_initializable<L2BookInternal>
 class MapBasedL3OrderBook : public L3OrderBook<MapBasedL3OrderBook<LevelContainer>> {
     friend class L3OrderBook<MapBasedL3OrderBook<LevelContainer>>;
 
@@ -74,6 +75,9 @@ class MapBasedL3OrderBook : public L3OrderBook<MapBasedL3OrderBook<LevelContaine
     decltype(auto) getWorstBidLevelImpl() { return *bidLevels_.begin(); };
     decltype(auto) getWorstAskLevelImpl() { return *askLevels_.begin(); };
 
+    const L2BookInternal* getL2BookImpl() const noexcept { return &l2_book_; }
+    L2BookInternal* getL2BookImpl() noexcept { return &l2_book_; }
+
     bool orderExistsImpl(const OrderId& orderId) const {
         return oidToLevelContainerItMap_.contains(orderId);
     }
@@ -121,6 +125,8 @@ class MapBasedL3OrderBook : public L3OrderBook<MapBasedL3OrderBook<LevelContaine
         priceToAskLevelItMap_;
     std::unordered_map<OrderId, typename LevelContainer::iterator>
         oidToLevelContainerItMap_;
+
+    L2BookInternal l2_book_;
 };
 
 #endif  // _BOOK_L3_MAP_HPP
