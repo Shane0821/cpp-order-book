@@ -47,17 +47,19 @@ class MapBasedL3OrderBook : public L3OrderBook<MapBasedL3OrderBook<LevelContaine
 
     // only does cancelling order from level
     // does not remove empty level
-    void levelCancelOrderImpl(LevelContainer& levelContainer,
+    void levelRemoveOrderImpl(LevelContainer& levelContainer,
                               typename LevelContainer::iterator levelContainerIt) {
         LevelContainerTraits<LevelContainer>::erase(levelContainer, levelContainerIt);
         oidToLevelContainerItMap_.erase((*levelContainerIt)->orderId_);
     }
 
     void removeEmptyBidLevelImpl(Price price) {
+        if (!priceToBidLevelItMap_.contains(price)) return;
         bidLevels_.erase(priceToBidLevelItMap_[price]);
         priceToBidLevelItMap_.erase(price);
     }
     void removeEmptyAskLevelImpl(Price price) {
+        if (!priceToAskLevelItMap_.contains(price)) return;
         askLevels_.erase(priceToAskLevelItMap_[price]);
         priceToAskLevelItMap_.erase(price);
     }
