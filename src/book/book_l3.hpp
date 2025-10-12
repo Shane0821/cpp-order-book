@@ -1,33 +1,29 @@
 #ifndef _BOOK_L3_HPP
 #define _BOOK_L3_HPP
 
+#include "book_l2.hpp"
 #include "book_l3_base.hpp"
 #include "level_info.h"
 #include "level_traits.hpp"
 #include "order.h"
 #include "order_modify.h"
+#include "order_validate.h"
 #include "trade.h"
 #include "util/objectpool.hpp"
 
 template <typename Derived, typename Base = L3OrderBookBase>
 class L3OrderBook : public L3OrderBookBase {
    public:
-    using OrderCancelCallback = std::function<void(const Order *)>;
-    using OrderAddCallback = std::function<void(const Order *)>;
-
     L3OrderBook() = default;
     virtual ~L3OrderBook() = default;
 
     // add order to the order book
     Trades addOrder(Order *order) {
-        // type check
-        static_assert(std::is_same_v<decltype(order->price_), Price>);
-        static_assert(std::is_same_v<decltype(order->initialQuantity_), Quantity>);
-        static_assert(std::is_same_v<decltype(order->remainingQuantity_), Quantity>);
-        static_assert(std::is_same_v<decltype(order->getOrderId()), OrderId>);
+        if (!OrderValidate::validte(order)) [[unlikely]] {
+            return {};
+        }
 
-        if (order == nullptr || order->remainingQuantity_ == 0 || order->price_ < 0 ||
-            static_cast<const Derived *>(this)->orderExistsImpl(order->getOrderId()))
+        if (static_cast<const Derived *>(this)->orderExistsImpl(order->getOrderId()))
             [[unlikely]] {
             return {};
         }
@@ -55,7 +51,7 @@ class L3OrderBook : public L3OrderBookBase {
 
         if (order->getOrderType() == OrderType::FillOrKill &&
             !canFullyFill(order->getSide(), order->getPrice(),
-                          order->getInitialQuantity())) {
+                          order->getRemainingQuantity())) {
             return {};
         }
 
@@ -74,7 +70,7 @@ class L3OrderBook : public L3OrderBookBase {
     }
 
     template <typename OrderIds>
-        requires std::same_as<OrderIds::value_type, std::string>
+        requires std::same_as<typename OrderIds::value_type, std::string>
     void cancelOrders(OrderIds &&orderIds) {
         for (const auto &orderId : orderIds) {
             cancelOrder(orderId);
@@ -96,8 +92,6 @@ class L3OrderBook : public L3OrderBookBase {
 
     void print() const { static_cast<const Derived *>(this)->printImpl(); }
 
-   protected:
-    // print the order book
     bool isBidEmpty() const {
         return static_cast<const Derived *>(this)->bidLevels_.empty();
     }
@@ -105,37 +99,36 @@ class L3OrderBook : public L3OrderBookBase {
         return static_cast<const Derived *>(this)->askLevels_.empty();
     }
 
-    // void PruneGoodForDayOrders();
-
-    bool canFullyFill(Side side, Price price, Quantity quantity) const {
+   protected:
+    bool canFullyFill(Side side, Price price, Quantity quantity) {
         if (!canMatch(side, price)) return false;
-
-        Price threshold;
 
         if (side == Side::Buy) {
             const auto &[askPrice, _] =
                 static_cast<Derived *>(this)->getBestAskLevelImpl();
-            threshold = askPrice;
+
+            static_cast<Derived *>(this)->getL2BookImpl()->forEachAskLevel(
+                price, askPrice, [&quantity](const L2LevelInfo &info) -> bool {
+                    quantity -= info.quantity_;
+                    return quantity <= 0;
+                });
+
         } else {
             const auto [bidPrice, _] =
                 static_cast<Derived *>(this)->getBestBidLevelImpl();
-            threshold = bidPrice;
+
+            static_cast<Derived *>(this)->getL2BookImpl()->forEachBidLevel(
+                bidPrice, price, [&quantity](const L2LevelInfo &info) -> bool {
+                    quantity -= info.quantity_;
+                    return quantity <= 0;
+                });
         }
 
-        for (const auto &[levelPrice, l2Info] : data_) {
-            if ((side == Side::Buy && levelPrice > price) ||
-                (side == Side::Sell && levelPrice < price))
-                break;
-
-            if (quantity <= l2Info.quantity_) return true;
-
-            quantity -= l2Info.quantity_;
-        }
-
-        return false;
+        return quantity <= 0;
     }
 
-    bool canMatch(Side side, Price price) const {
+    // determines if an order can be matched immediately
+    bool canMatch(Side side, Price price) {
         if (side == Side::Buy) {
             if (isAskEmpty()) [[unlikely]] {
                 return false;
@@ -184,18 +177,16 @@ class L3OrderBook : public L3OrderBookBase {
                 trades.emplace_back(TradeInfo{bid->getOrderId(), bidPrice, quantity},
                                     TradeInfo{ask->getOrderId(), askPrice, quantity});
 
-                // update callback
-                onOrderMatched(bidPrice, quantity, bid->isFilled());
-                onOrderMatched(askPrice, quantity, ask->isFilled());
+                onOrderMatched(bid, ask, quantity);
 
                 if (bid->isFilled()) {
-                    static_cast<Derived *>(this)->levelCancelOrderImpl(bids, bidIt);
-                    // TODO: recycle bid
+                    static_cast<Derived *>(this)->levelRemoveOrderImpl(bids, bidIt);
+                    // TODO: recycle
                 }
 
                 if (ask->isFilled()) {
-                    static_cast<Derived *>(this)->levelCancelOrderImpl(asks, askIt);
-                    // TODO: recycle ask
+                    static_cast<Derived *>(this)->levelRemoveOrderImpl(asks, askIt);
+                    // TODO: recycle
                 }
             }
 
@@ -224,12 +215,25 @@ class L3OrderBook : public L3OrderBookBase {
         return trades;
     }
 
-    void onOrderCancelled(const Order *order) {}
-    void onOrderAdded(const Order *order) {}
-    void onOrderMatched(Price price, Quantity quantity, bool isFullyFilled) {}
+    void onOrderCancelled(const Order *order) {
+        static_cast<Derived *>(this)->getL2BookImpl()->cancelOrder(order);
+        // TODO: recycle
 
-    OrderCancelCallback orderCancelCallback_{nullptr};
-    OrderAddCallback orderAddCallback_{nullptr};
+        // TODO: support external callback
+    }
+
+    void onOrderAdded(const Order *order) {
+        static_cast<Derived *>(this)->getL2BookImpl()->addOrder(order);
+        // TODO: support external callback
+    }
+
+    void onOrderMatched(const Order *bid, const Order *ask, Quantity quantity) {
+        static_cast<Derived *>(this)->getL2BookImpl()->cancelOrder(Side::Buy, bid->price_,
+                                                                   quantity);
+        static_cast<Derived *>(this)->getL2BookImpl()->cancelOrder(Side::Sell,
+                                                                   ask->price_, quantity);
+        // TODO: support external callback
+    }
 };
 
 #endif  // _BOOK_L3_HPP
