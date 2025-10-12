@@ -52,6 +52,28 @@ class L2OrderBook : public Base {
         return static_cast<const Derived*>(this)->askLevels_.empty();
     }
 
+    void forEachBidLevel(Price pmin, Price pmax,
+                         const std::function<bool(const L2LevelInfo&)>& cb) const {
+        for (auto it = static_cast<Derived*>(this)->bidBegin();
+             it != static_cast<Derived*>(this)->bidEnd(); ++it) {
+            const auto& [price, info] = *it;
+            if (price > pmax) continue;
+            if (price < pmin) break;
+            if (!cb(info)) break;
+        }
+    }
+
+    void forEachAskLevel(Price pmin, Price pmax,
+                         const std::function<bool(const L2LevelInfo&)>& cb) const {
+        for (auto it = static_cast<Derived*>(this)->bidBegin();
+             it != static_cast<Derived*>(this)->bidEnd(); ++it) {
+            const auto& [price, info] = *it;
+            if (price < pmin) continue;
+            if (price > pmax) break;
+            if (!cb(info)) break;
+        }
+    }
+
     void print() const { static_cast<const Derived*>(this)->printImpl(); }
 };
 
