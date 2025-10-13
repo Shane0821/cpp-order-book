@@ -10,8 +10,8 @@
 template <LevelContainerBase LevelContainer, typename L2BookInternal = MapBasedL2OrderBook>
     requires std::same_as<typename LevelContainer::value_type, Order*> &&
              std::default_initializable<L2BookInternal>
-class MapBasedL3OrderBook : public L3OrderBook<MapBasedL3OrderBook<LevelContainer>> {
-    friend class L3OrderBook<MapBasedL3OrderBook<LevelContainer>>;
+class MapBasedL3OrderBook : public L3OrderBook<MapBasedL3OrderBook<LevelContainer, L2BookInternal>> {
+    friend class L3OrderBook<MapBasedL3OrderBook<LevelContainer, L2BookInternal>>;
 
    public:
     MapBasedL3OrderBook() = default;
@@ -74,8 +74,8 @@ class MapBasedL3OrderBook : public L3OrderBook<MapBasedL3OrderBook<LevelContaine
     decltype(auto) getBestBidLevelImpl() { return *bidLevels_.begin(); }
     decltype(auto) getBestAskLevelImpl() { return *askLevels_.begin(); }
 
-    decltype(auto) getWorstBidLevelImpl() { return *bidLevels_.begin(); };
-    decltype(auto) getWorstAskLevelImpl() { return *askLevels_.begin(); };
+    decltype(auto) getWorstBidLevelImpl() { return *bidLevels_.rbegin(); };
+    decltype(auto) getWorstAskLevelImpl() { return *askLevels_.rbegin(); };
 
     const L2BookInternal* getL2BookImpl() const noexcept { return &l2_book_; }
     L2BookInternal* getL2BookImpl() noexcept { return &l2_book_; }
