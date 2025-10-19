@@ -1,59 +1,112 @@
 #ifndef _OBJECTPOOL_H
 #define _OBJECTPOOL_H
 
+#include <sys/mman.h>
+
 #include <concepts>
 #include <memory>
 #include <mutex>
+#include <unordered_set>
 #include <vector>
 
 #include "singleton.hpp"
 
-template <typename T, size_t MIN_SIZE = 32, size_t MAX_SIZE = 65536>
-    requires std::default_initializable<T> && std::destructible<T>
-class ObjectPool : public Singleton<ObjectPool<T, MIN_SIZE, MAX_SIZE>> {
-    friend class Singleton<ObjectPool<T, MIN_SIZE, MAX_SIZE>>;
+template <typename T, size_t BLOCK_SIZE = (1 << 12)>
+class ObjectPool : public Singleton<ObjectPool<T, BLOCK_SIZE>> {
+    friend class Singleton<ObjectPool<T, BLOCK_SIZE>>;
 
    public:
-    // forbid copy
-    ObjectPool(const ObjectPool&) = delete;
-    ObjectPool& operator=(const ObjectPool&) = delete;
+    using value_type = T;
 
-    // acquire object
-    std::unique_ptr<T> acquire() {
+    // forbid copy
+    ObjectPool(const ObjectPool &) = delete;
+    ObjectPool &operator=(const ObjectPool &) = delete;
+
+    // allocate object
+    template <typename... Args>
+    T *allocate(Args &&...args) {
         std::lock_guard<std::mutex> lock(mtx);
+
+        T *obj = nullptr;
         // if pool is not empty, return the last object
-        if (!pool.empty()) {
-            auto obj = std::move(pool.back());
-            pool.pop_back();
-            return obj;  // xvalue
+        if (!objList_.empty()) [[likely]] {
+            obj = objList_.back();
+            objList_.pop_back();
+            new (obj) T{std::forward<Args>(args)...};
+        } else {
+            // if pool is empty, create a new object
+            obj = new T{std::forward<Args>(args)...};
         }
-        // if pool is empty, create a new object
-        return std::make_unique<T>();  // prvalue
+        unreturned_.insert(obj);
+        return obj;
     }
 
     // release object
-    void release(std::unique_ptr<T> obj) {
+    void deallocate(T *obj) {
         std::lock_guard<std::mutex> lock(mtx);
-        if (pool.size() >= MAX_SIZE) {
-            // obj is destroyed when out of scope
+
+        auto it = unreturned_.find(obj);
+        if (it == unreturned_.end()) [[unlikely]] {
             return;
         }
-        pool.push_back(std::move(obj));
+        unreturned_.erase(it);
+
+        if (isMmapAllocated(obj)) [[likely]] {
+            obj->~T();
+            objList_.push_back(obj);
+            return;
+        }
+        // allocated by new
+        delete obj;
     }
 
-    size_t size() const { return pool.size(); }
+    size_t size() {
+        std::lock_guard<std::mutex> lock(mtx);
+        return objList_.size();
+    }
 
    protected:
-    ObjectPool(size_t initialSize = MIN_SIZE) {
-        initialSize = std::min(std::max(initialSize, MIN_SIZE), MAX_SIZE);
-        pool.reserve(initialSize);
-        for (size_t i = 0; i < initialSize; ++i) {
-            pool.push_back(std::make_unique<T>());
+    ObjectPool() {
+        std::lock_guard<std::mutex> lock(mtx);
+        void *map = mmap(0, sizeof(T) * BLOCK_SIZE, PROT_READ | PROT_WRITE,
+                         MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        if (map == MAP_FAILED) {
+            throw std::runtime_error("fail to alloc pool buffer");
         }
+
+        buffer_ = reinterpret_cast<T *>(map);
+        objList_.reserve(BLOCK_SIZE);
+        T *tmp = buffer_;
+        for (int i = 0; i < BLOCK_SIZE; i++) {
+            objList_.push_back(tmp);
+            tmp++;
+        }
+    }
+
+    ~ObjectPool() {
+        std::lock_guard<std::mutex> lock(mtx);
+        // handle objs not returned
+        for (auto obj : unreturned_) {
+            if (isMmapAllocated(obj)) {
+                obj->~T();
+            } else {
+                delete obj;
+            }
+        }
+
+        // every element in freeeList is not constructed
+        // so we can just do unmap
+        munmap(buffer_, sizeof(T) * BLOCK_SIZE);
     }
 
    private:
-    std::vector<std::unique_ptr<T>> pool;
+    bool isMmapAllocated(T *obj) const {
+        return (obj >= buffer_ && obj < buffer_ + BLOCK_SIZE);
+    }
+
+    std::vector<T *> objList_;
+    std::unordered_set<T *> unreturned_;
+    T *buffer_;
     std::mutex mtx;
 };
 

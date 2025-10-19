@@ -2,43 +2,83 @@
 
 #include <gtest/gtest.h>
 
-TEST(ObjectPoolTest, ObjectPoolTest) {
-    static int createCount;
-    static int destroyCount;
+#include <iostream>
 
-    struct TestObject {
-        TestObject() { createCount++; }
-        ~TestObject() { destroyCount++; }
+static int createCount;
+static int destroyCount;
 
-        int getData() { return data; }
+struct TestObject {
+    TestObject() { createCount++; }
+    explicit TestObject(int v) : TestObject() { data = v; }
+    ~TestObject() { destroyCount++; }
 
-        int data{0};
-    };
+    int getData() { return data; }
 
-    {
-        auto &pool = ObjectPool<TestObject>::GetInst();
-        EXPECT_EQ(createCount, 32);
-        EXPECT_EQ(pool.size(), 32);
+    int data{0};
+};
 
-        auto p1 = pool.acquire();
-        EXPECT_EQ(pool.size(), 31);
-        EXPECT_EQ(p1->getData(), 0);
-        p1->data = 10;
-        pool.release(std::move(p1));
-        EXPECT_EQ(pool.size(), 32);
+TEST(ObjectPoolTest, Basic) {
+    createCount = 0;
+    destroyCount = 0;
 
-        // reuse the object
-        {
-            auto p2 = pool.acquire();
-            EXPECT_EQ(pool.size(), 31);
-            EXPECT_EQ(p2->getData(), 10);
-            p2->data = 20;
-            EXPECT_EQ(p2->getData(), 20);
-            // destroy p2
-        }
+    static constexpr size_t INITIAL_SIZE = 32;
+    auto &pool = ObjectPool<TestObject, INITIAL_SIZE>::GetInst();
+    EXPECT_EQ(pool.size(), INITIAL_SIZE);
 
-        EXPECT_EQ(pool.size(), 31);
+    auto p1 = pool.allocate();
+    EXPECT_EQ(pool.size(), INITIAL_SIZE - 1);
+    EXPECT_EQ(p1->getData(), 0);
+    p1->data = 10;
+    pool.deallocate(p1);
+    EXPECT_EQ(pool.size(), INITIAL_SIZE);
+
+    auto p2 = pool.allocate(10);
+    EXPECT_EQ(pool.size(), INITIAL_SIZE - 1);
+    EXPECT_EQ(p2->getData(), 10);
+    p2->data = 20;
+    EXPECT_EQ(p2->getData(), 20);
+    pool.deallocate(p2);
+    EXPECT_EQ(pool.size(), INITIAL_SIZE);
+
+    EXPECT_EQ(createCount, 2);
+    EXPECT_EQ(destroyCount, 2);
+};
+
+TEST(ObjectPoolTest, Mixed) {
+    createCount = 0;
+    destroyCount = 0;
+
+    static constexpr size_t INITIAL_SIZE = 32;
+    auto &pool = ObjectPool<TestObject, INITIAL_SIZE>::GetInst();
+    EXPECT_EQ(pool.size(), INITIAL_SIZE);
+
+    std::vector<TestObject *> objs;
+    for (int i = 0; i < INITIAL_SIZE; i++) {
+        auto p1 = pool.allocate(i);
+        EXPECT_EQ(pool.size(), INITIAL_SIZE - i - 1);
+        EXPECT_EQ(p1->getData(), i);
+        objs.push_back(p1);
     }
-    EXPECT_EQ(createCount, 32);
-    EXPECT_EQ(destroyCount, 1);
+
+    for (int i = INITIAL_SIZE; i < INITIAL_SIZE * 2; i++) {
+        auto p1 = pool.allocate(i);
+        EXPECT_EQ(pool.size(), 0);
+        EXPECT_EQ(p1->getData(), i);
+        objs.push_back(p1);
+    }
+
+    for (int i = 0; i < INITIAL_SIZE; i++) {
+        pool.deallocate(objs.back());
+        objs.pop_back();
+        EXPECT_EQ(pool.size(), 0);
+    }
+
+    for (int i = 0; i < INITIAL_SIZE; i++) {
+        pool.deallocate(objs.back());
+        objs.pop_back();
+        EXPECT_EQ(pool.size(), i + 1);
+    }
+
+    EXPECT_EQ(createCount, INITIAL_SIZE * 2);
+    EXPECT_EQ(destroyCount, INITIAL_SIZE * 2);
 };
