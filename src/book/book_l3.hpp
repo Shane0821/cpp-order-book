@@ -181,12 +181,12 @@ class L3OrderBook : public L3OrderBookBase {
 
                 if (bid->isFilled()) {
                     static_cast<Derived *>(this)->levelRemoveOrderImpl(bids, bidIt);
-                    // TODO: recycle
+                    onOrderCancelled(bid, false);
                 }
 
                 if (ask->isFilled()) {
                     static_cast<Derived *>(this)->levelRemoveOrderImpl(asks, askIt);
-                    // TODO: recycle
+                    onOrderCancelled(bid, false);
                 }
             }
 
@@ -215,19 +215,20 @@ class L3OrderBook : public L3OrderBookBase {
         return trades;
     }
 
-    void onOrderCancelled(const Order *order) {
-        static_cast<Derived *>(this)->getL2BookImpl()->cancelOrder(order);
-        // TODO: recycle
-
+    void onOrderCancelled(Order *order, bool updateL2 = true) {
+        if (updateL2) {
+            static_cast<Derived *>(this)->getL2BookImpl()->cancelOrder(order);
+        }
+        ObjectPool<Order>::GetInst().deallocate(order);
         // TODO: support external callback
     }
 
-    void onOrderAdded(const Order *order) {
+    void onOrderAdded(Order *order) {
         static_cast<Derived *>(this)->getL2BookImpl()->addOrder(order);
         // TODO: support external callback
     }
 
-    void onOrderMatched(const Order *bid, const Order *ask, Quantity quantity) {
+    void onOrderMatched(Order *bid, const Order *ask, Quantity quantity) {
         static_cast<Derived *>(this)->getL2BookImpl()->cancelOrder(Side::Buy, bid->price_,
                                                                    quantity);
         static_cast<Derived *>(this)->getL2BookImpl()->cancelOrder(Side::Sell,
