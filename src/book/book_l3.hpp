@@ -219,7 +219,6 @@ class L3OrderBook : public L3OrderBookBase {
         if (updateL2) {
             static_cast<Derived *>(this)->getL2BookImpl()->cancelOrder(order);
         }
-        ObjectPool<Order>::GetInst().deallocate(order);
         // TODO: support external callback
     }
 
