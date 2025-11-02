@@ -6,6 +6,7 @@
 #include "level_info.h"
 #include "level_traits.hpp"
 #include "order.h"
+#include "order_cmp.h"
 #include "order_modify.h"
 #include "order_validate.h"
 #include "trade.h"
@@ -98,6 +99,9 @@ class L3OrderBook : public L3OrderBookBase {
     bool isAskEmpty() const {
         return static_cast<const Derived *>(this)->askLevels_.empty();
     }
+
+    Order *getBestBid() { return static_cast<Derived *>(this)->getBestBidImpl(); }
+    Order *getBestAsk() { return static_cast<Derived *>(this)->getBestAskImpl(); }
 
    protected:
     bool canFullyFill(Side side, Price price, Quantity quantity) {
