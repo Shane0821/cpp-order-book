@@ -58,7 +58,7 @@ TEST(LevelTraitsTest, PtrDequeInsert) {
 }
 
 TEST(LevelTraitsTest, SetInsert) {
-    std::set<Order, OrderComparison> s;
+    std::set<Order, OrderCompare> s;
 
     auto it = LevelContainerTraits<decltype(s)>::insert(
         s, Order{"1", OrderType::GoodTillCancel, Side::Buy, 100.0, 100});
@@ -69,7 +69,7 @@ TEST(LevelTraitsTest, SetInsert) {
 }
 
 TEST(LevelTraitsTest, PtrSetInsert) {
-    std::set<Order *, OrderComparison> s;
+    std::set<Order *, OrderCompare> s;
 
     Order order1{"1", OrderType::GoodTillCancel, Side::Buy, 100.0, 100};
     auto it = LevelContainerTraits<decltype(s)>::insert(s, &order1);
@@ -80,7 +80,7 @@ TEST(LevelTraitsTest, PtrSetInsert) {
 }
 
 TEST(LevelTraitsTest, MultisetInsert) {
-    std::multiset<Order, OrderComparison> s;
+    std::multiset<Order, OrderCompare> s;
 
     auto it = LevelContainerTraits<decltype(s)>::insert(
         s, Order{"1", OrderType::GoodTillCancel, Side::Buy, 100.0, 100});
@@ -91,7 +91,7 @@ TEST(LevelTraitsTest, MultisetInsert) {
 }
 
 TEST(LevelTraitsTest, PtrMultisetInsert) {
-    std::multiset<Order *, OrderComparison> s;
+    std::multiset<Order *, OrderCompare> s;
 
     Order order1{"1", OrderType::GoodTillCancel, Side::Buy, 100.0, 100};
     auto it = LevelContainerTraits<decltype(s)>::insert(s, &order1);
