@@ -7,16 +7,15 @@
 #include "level_searcher.hpp"
 
 // NOTE: do not use vector for level container (because of it invalidation)
-template <LevelContainerBase LevelContainer,
-          typename L2BookInternal = MapBasedL2OrderBook,
-          typename LevelSearcher = BinaryLevelSearcher, size_t MAX_DEPTH = 65536>
+template <LevelContainerBase LevelContainer, typename LevelSearcher = BinaryLevelSearcher,
+          typename L2BookInternal = MapBasedL2OrderBook, size_t MAX_DEPTH = 65536>
     requires std::same_as<typename LevelContainer::value_type, Order*> &&
              std::default_initializable<L2BookInternal>
 class VectorBasedL3OrderBook
-    : public L3OrderBook<VectorBasedL3OrderBook<LevelContainer, L2BookInternal,
-                                                LevelSearcher, MAX_DEPTH>> {
+    : public L3OrderBook<VectorBasedL3OrderBook<LevelContainer, LevelSearcher,
+                                                L2BookInternal, MAX_DEPTH>> {
     friend class L3OrderBook<
-        VectorBasedL3OrderBook<LevelContainer, L2BookInternal, LevelSearcher, MAX_DEPTH>>;
+        VectorBasedL3OrderBook<LevelContainer, LevelSearcher, L2BookInternal, MAX_DEPTH>>;
 
    public:
     VectorBasedL3OrderBook() {
