@@ -15,17 +15,13 @@
 template <typename Derived, typename Base = L3OrderBookBase>
 class L3OrderBook : public L3OrderBookBase {
    public:
-    L3OrderBook() = default;
-    virtual ~L3OrderBook() = default;
-
     // add order to the order book
     Trades addOrder(Order *order) {
         if (!OrderValidate::validte(order)) [[unlikely]] {
             return {};
         }
 
-        if (static_cast<const Derived *>(this)->orderExistsImpl(order->getOrderId()))
-            [[unlikely]] {
+        if (derived()->orderExistsImpl(order->getOrderId())) [[unlikely]] {
             return {};
         }
 
@@ -33,12 +29,10 @@ class L3OrderBook : public L3OrderBookBase {
             // the worst price is only used for matching
             // the actual price executed is on the other side
             if (order->getSide() == Side::Buy && !isAskEmpty()) {
-                const auto &[worstAskPrice, _] =
-                    static_cast<Derived *>(this)->getWorstAskLevelImpl();
+                const auto &[worstAskPrice, _] = derived()->getWorstAskLevelImpl();
                 order->toGoodTillCancel(worstAskPrice);
             } else if (order->getSide() == Side::Sell && !isBidEmpty()) {
-                const auto &[worstBidPrice, _] =
-                    static_cast<Derived *>(this)->getWorstBidLevelImpl();
+                const auto &[worstBidPrice, _] = derived()->getWorstBidLevelImpl();
                 order->toGoodTillCancel(worstBidPrice);
             } else {
                 return {};
@@ -56,17 +50,17 @@ class L3OrderBook : public L3OrderBookBase {
             return {};
         }
 
-        static_cast<Derived *>(this)->addOrderImpl(order);
+        derived()->addOrderImpl(order);
         onOrderAdded(order);
         return MatchOrders();
     }
 
     // cancel order by order ID
     void cancelOrder(const OrderId &orderId) {
-        if (!static_cast<Derived *>(this)->orderExistsImpl(orderId)) [[unlikely]] {
+        if (!derived()->orderExistsImpl(orderId)) [[unlikely]] {
             return;
         }
-        Order *order = static_cast<Derived *>(this)->cancelOrderImpl(orderId);
+        Order *order = derived()->cancelOrderImpl(orderId);
         onOrderCancelled(order);
     }
 
@@ -79,49 +73,41 @@ class L3OrderBook : public L3OrderBookBase {
     }
 
     Trades modifyOrder(const OrderId &orderId, const OrderModify &modify) {
-        if (!static_cast<Derived *>(this)->orderExistsImpl(orderId)) [[unlikely]] {
+        if (!derived()->orderExistsImpl(orderId)) [[unlikely]] {
             return {};
         }
-        Order *order = static_cast<Derived *>(this)->cancelOrderImpl(orderId);
+        Order *order = derived()->cancelOrderImpl(orderId);
         modify.toOrderPointer(order);
-        return static_cast<Derived *>(this)->addOrderImpl(order);
+        return derived()->addOrderImpl(order);
     }
 
-    size_t getOrderCount() const {
-        return static_cast<const Derived *>(this)->getOrderCountImpl();
-    }
+    size_t getOrderCount() const { return derived()->getOrderCountImpl(); }
 
-    void print() const { static_cast<const Derived *>(this)->printImpl(); }
+    void print() const { derived()->printImpl(); }
 
-    bool isBidEmpty() const {
-        return static_cast<const Derived *>(this)->bidLevels_.empty();
-    }
-    bool isAskEmpty() const {
-        return static_cast<const Derived *>(this)->askLevels_.empty();
-    }
+    bool isBidEmpty() const { return derived()->bidLevels_.empty(); }
+    bool isAskEmpty() const { return derived()->askLevels_.empty(); }
 
-    Order *getBestBid() { return static_cast<Derived *>(this)->getBestBidImpl(); }
-    Order *getBestAsk() { return static_cast<Derived *>(this)->getBestAskImpl(); }
+    Order *getBestBid() { return derived()->getBestBidImpl(); }
+    Order *getBestAsk() { return derived()->getBestAskImpl(); }
 
    protected:
     bool canFullyFill(Side side, Price price, Quantity quantity) {
         if (!canMatch(side, price)) return false;
 
         if (side == Side::Buy) {
-            const auto &[askPrice, _] =
-                static_cast<Derived *>(this)->getBestAskLevelImpl();
+            const auto &[askPrice, _] = derived()->getBestAskLevelImpl();
 
-            static_cast<Derived *>(this)->getL2BookImpl()->forEachAskLevel(
+            derived()->getL2BookImpl()->forEachAskLevel(
                 price, askPrice, [&quantity](const L2LevelInfo &info) -> bool {
                     quantity -= info.quantity_;
                     return quantity <= 0;
                 });
 
         } else {
-            const auto [bidPrice, _] =
-                static_cast<Derived *>(this)->getBestBidLevelImpl();
+            const auto [bidPrice, _] = derived()->getBestBidLevelImpl();
 
-            static_cast<Derived *>(this)->getL2BookImpl()->forEachBidLevel(
+            derived()->getL2BookImpl()->forEachBidLevel(
                 bidPrice, price, [&quantity](const L2LevelInfo &info) -> bool {
                     quantity -= info.quantity_;
                     return quantity <= 0;
@@ -137,15 +123,13 @@ class L3OrderBook : public L3OrderBookBase {
             if (isAskEmpty()) [[unlikely]] {
                 return false;
             }
-            const auto &[askPrice, _] =
-                static_cast<Derived *>(this)->getBestAskLevelImpl();
+            const auto &[askPrice, _] = derived()->getBestAskLevelImpl();
             return askPrice <= price;
         } else {
             if (isBidEmpty()) [[unlikely]] {
                 return false;
             }
-            const auto &[bidPrice, _] =
-                static_cast<Derived *>(this)->getBestBidLevelImpl();
+            const auto &[bidPrice, _] = derived()->getBestBidLevelImpl();
             return bidPrice >= price;
         }
     }
@@ -156,8 +140,8 @@ class L3OrderBook : public L3OrderBookBase {
         while (true) {
             if (isBidEmpty() || isAskEmpty()) break;
 
-            auto &[bidPrice, bids] = static_cast<Derived *>(this)->getBestBidLevelImpl();
-            auto &[askPrice, asks] = static_cast<Derived *>(this)->getBestAskLevelImpl();
+            auto &[bidPrice, bids] = derived()->getBestBidLevelImpl();
+            auto &[askPrice, asks] = derived()->getBestAskLevelImpl();
 
             // no cross
             if (bidPrice < askPrice) break;
@@ -184,34 +168,34 @@ class L3OrderBook : public L3OrderBookBase {
                 onOrderMatched(bid, ask, quantity);
 
                 if (bid->isFilled()) {
-                    static_cast<Derived *>(this)->levelRemoveOrderImpl(bids, bidIt);
+                    derived()->levelRemoveOrderImpl(bids, bidIt);
                     onOrderCancelled(bid, false);
                 }
 
                 if (ask->isFilled()) {
-                    static_cast<Derived *>(this)->levelRemoveOrderImpl(asks, askIt);
+                    derived()->levelRemoveOrderImpl(asks, askIt);
                     onOrderCancelled(bid, false);
                 }
             }
 
             if (LevelContainerTraits<BidLevelContainer>::empty(bids)) {
-                static_cast<Derived *>(this)->removeEmptyBidLevelImpl(bidPrice);
+                derived()->removeEmptyBidLevelImpl(bidPrice);
             }
 
             if (LevelContainerTraits<AskLevelContainer>::empty(asks)) {
-                static_cast<Derived *>(this)->removeEmptyAskLevelImpl(askPrice);
+                derived()->removeEmptyAskLevelImpl(askPrice);
             }
         }
 
         if (!isBidEmpty()) {
-            Order *order = static_cast<Derived *>(this)->getBestBidImpl();
+            Order *order = derived()->getBestBidImpl();
             if (order->getOrderType() == OrderType::FillAndKill) {
                 cancelOrder(order->getOrderId());
             }
         }
 
         if (!isAskEmpty()) {
-            Order *order = static_cast<Derived *>(this)->getBestAskImpl();
+            Order *order = derived()->getBestAskImpl();
             if (order->getOrderType() == OrderType::FillAndKill) {
                 cancelOrder(order->getOrderId());
             }
@@ -221,23 +205,28 @@ class L3OrderBook : public L3OrderBookBase {
 
     void onOrderCancelled(Order *order, bool updateL2 = true) {
         if (updateL2) {
-            static_cast<Derived *>(this)->getL2BookImpl()->cancelOrder(order);
+            derived()->getL2BookImpl()->cancelOrder(order);
         }
         // TODO: support external callback
     }
 
     void onOrderAdded(Order *order) {
-        static_cast<Derived *>(this)->getL2BookImpl()->addOrder(order);
+        derived()->getL2BookImpl()->addOrder(order);
         // TODO: support external callback
     }
 
     void onOrderMatched(Order *bid, const Order *ask, Quantity quantity) {
-        static_cast<Derived *>(this)->getL2BookImpl()->cancelOrder(Side::Buy, bid->price_,
-                                                                   quantity);
-        static_cast<Derived *>(this)->getL2BookImpl()->cancelOrder(Side::Sell,
-                                                                   ask->price_, quantity);
+        derived()->getL2BookImpl()->cancelOrder(Side::Buy, bid->price_, quantity);
+        derived()->getL2BookImpl()->cancelOrder(Side::Sell, ask->price_, quantity);
         // TODO: support external callback
     }
+
+   protected:
+    L3OrderBook() = default;
+    ~L3OrderBook() = default;
+
+    Derived *derived() { return static_cast<Derived *>(this); }
+    const Derived *derived() const { return static_cast<const Derived *>(this); }
 };
 
 #endif  // _BOOK_L3_HPP
